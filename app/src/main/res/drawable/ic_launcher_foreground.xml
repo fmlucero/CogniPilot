@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Foreground del ícono: camión de logística (vector) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Cuerpo del camión -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,60 L20,38 Q20,34 24,34 L68,34 L68,60 Z" />
+
+    <!-- Cabina del camión -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M68,44 L84,44 Q88,44 88,48 L88,60 L68,60 Z" />
+
+    <!-- Ventana de cabina -->
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M70,46 L84,46 L84,56 L70,56 Z" />
+
+    <!-- Rueda trasera -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,60 m-10,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M34,60 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+
+    <!-- Rueda delantera -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M78,60 m-10,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M78,60 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+
+    <!-- Señal de alerta (!) -->
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M54,14 L58,14 L57,30 L55,30 Z" />
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M54,32 L58,32 L58,36 L54,36 Z" />
+
+</vector>
