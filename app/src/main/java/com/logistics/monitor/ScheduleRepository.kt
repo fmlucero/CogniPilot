@@ -1,6 +1,10 @@
 package com.logistics.monitor
 
 import android.content.Context
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * Cache local del horario permitido para escanear, sincronizado vía FCM
@@ -47,4 +51,37 @@ data class ScheduleSnapshot(
     val to: String?,
     val tz: String?,
     val updatedAt: Long
-)
+) {
+    /**
+     * Decide si los carteles deben mostrarse en este momento.
+     *  - enabled=false → sin restricción → mostrar siempre.
+     *  - enabled=true y now dentro del rango → horario permitido → silenciar.
+     *  - enabled=true y now fuera del rango → mostrar.
+     *  - Datos incompletos o tz inválida → fallback: mostrar (modo seguro).
+     */
+    fun shouldShowOverlays(now: ZonedDateTime = ZonedDateTime.now()): Boolean {
+        if (!enabled) return true
+        val from = from ?: return true
+        val to = to ?: return true
+
+        val zone = runCatching { ZoneId.of(tz ?: "UTC") }.getOrNull() ?: return true
+        val nowInZone = now.withZoneSameInstant(zone).toLocalTime()
+
+        val fromTime = runCatching { LocalTime.parse(from, FORMATTER) }.getOrNull() ?: return true
+        val toTime = runCatching { LocalTime.parse(to, FORMATTER) }.getOrNull() ?: return true
+
+        val inside = if (fromTime.isBefore(toTime)) {
+            // Rango normal: ej 08:00 → 18:00
+            !nowInZone.isBefore(fromTime) && nowInZone.isBefore(toTime)
+        } else {
+            // Rango que cruza medianoche: ej 22:00 → 06:00
+            !nowInZone.isBefore(fromTime) || nowInZone.isBefore(toTime)
+        }
+        return !inside
+    }
+
+    companion object {
+        private val FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+    }
+}
+

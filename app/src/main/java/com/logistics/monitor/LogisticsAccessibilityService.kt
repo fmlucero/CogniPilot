@@ -53,6 +53,7 @@ class LogisticsAccessibilityService : AccessibilityService() {
     }
 
     private lateinit var overlayManager: OverlayManager
+    private lateinit var scheduleRepository: ScheduleRepository
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var warningShown = false
@@ -66,6 +67,7 @@ class LogisticsAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         overlayManager = OverlayManager(this)
+        scheduleRepository = ScheduleRepository(this)
         isServiceConnected = true
         instance = this
 
@@ -109,6 +111,13 @@ class LogisticsAccessibilityService : AccessibilityService() {
         // Si el monitor está desactivado desde la app principal, no mostramos
         // overlays — el servicio sigue escuchando pero en modo silencioso.
         if (!LogisticsMonitoringService.isRunning) {
+            if (targetAppActive || warningShown || blockingShown) resetState()
+            return
+        }
+
+        // Gate horario: si estamos dentro del rango permitido por el supervisor,
+        // tampoco mostramos carteles (la app target funciona normal).
+        if (!scheduleRepository.load().shouldShowOverlays()) {
             if (targetAppActive || warningShown || blockingShown) resetState()
             return
         }
