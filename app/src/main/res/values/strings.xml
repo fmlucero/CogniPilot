@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Monitor Logística</string>
+    <string name="accessibility_service_label">Monitor Logística</string>
+    <string name="accessibility_service_description">Detecta apertura de Envíos SC Pack y bloquea escaneos QR anticipados.</string>
+</resources>

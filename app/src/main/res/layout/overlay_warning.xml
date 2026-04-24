@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Overlay 1: Advertencia informativa (1er cartel) -->
+<!-- Se muestra cuando com.mercadoenvios.logistics se abre -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#E6FF9800"
+    android:padding="20dp"
+    android:elevation="24dp">
+
+    <TextView
+        android:id="@+id/tvWarningTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🚚 ENVÍOS SC PACK ABIERTO"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#1A1A1A"
+        android:gravity="center"
+        android:paddingBottom="12dp" />
+
+    <TextView
+        android:id="@+id/tvWarningMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Recordá respetar los horarios programados."
+        android:textSize="14sp"
+        android:textColor="#1A1A1A"
+        android:lineSpacingExtra="4dp"
+        android:paddingBottom="16dp" />
+
+    <Button
+        android:id="@+id/btnDismiss"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:text="Entendido"
+        android:backgroundTint="#1A1A1A"
+        android:textColor="@android:color/white" />
+
+</LinearLayout>

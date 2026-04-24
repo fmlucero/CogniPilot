@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Configuración del AccessibilityService.
+
+    eventTypes: qué tipos de eventos escuchar
+    - typeWindowStateChanged: cuando cambia la pantalla/actividad activa
+    - typeWindowContentChanged: cuando cambia el contenido (nueva lista, botón aparece, etc.)
+    - typeViewClicked: cuando el usuario toca algo
+
+    packageNames: SOLO escuchamos com.mercadoenvios.logistics
+    → esto es crucial para no gastar batería en otras apps
+
+    flags:
+    - flagReportViewIds: incluye el ID de recurso de cada vista (ej: "btn_scan_qr")
+    - flagRetrieveInteractiveWindows: acceso a TODAS las ventanas del sistema
+-->
+<accessibility-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewClicked|typeViewFocused"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:notificationTimeout="100"
+    android:packageNames="com.mercadoenvios.logistics"
+    android:description="@string/accessibility_service_description" />

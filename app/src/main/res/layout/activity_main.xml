@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="@color/background_dark">
+
+    <!-- Header -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🚚 Monitor de Logística"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary"
+        android:gravity="center"
+        android:paddingBottom="8dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Envíos SC Pack · com.mercadoenvios.logistics"
+        android:textSize="12sp"
+        android:textColor="@color/text_secondary"
+        android:gravity="center"
+        android:paddingBottom="24dp" />
+
+    <!-- Estado del sistema -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Estado del sistema"
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary"
+        android:paddingBottom="8dp" />
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Verificando..."
+        android:textSize="13sp"
+        android:textColor="@color/text_primary"
+        android:background="@color/card_background"
+        android:padding="16dp"
+        android:lineSpacingExtra="4dp"
+        android:layout_marginBottom="24dp" />
+
+    <!-- Paso 1 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Paso 1 — Permiso de overlay"
+        android:textSize="13sp"
+        android:textColor="@color/text_secondary"
+        android:paddingBottom="6dp" />
+
+    <Button
+        android:id="@+id/btnConfigureOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="Configurar permiso overlay"
+        android:backgroundTint="@color/accent_blue"
+        android:textColor="@android:color/white"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Paso 2 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Paso 2 — Servicio de accesibilidad"
+        android:textSize="13sp"
+        android:textColor="@color/text_secondary"
+        android:paddingBottom="6dp" />
+
+    <Button
+        android:id="@+id/btnOpenAccessibility"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="Abrir configuración de accesibilidad"
+        android:backgroundTint="@color/accent_blue"
+        android:textColor="@android:color/white"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Paso 3 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Paso 3 — Notificación persistente (opcional)"
+        android:textSize="13sp"
+        android:textColor="@color/text_secondary"
+        android:paddingBottom="6dp" />
+
+    <Button
+        android:id="@+id/btnToggleMonitor"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="▶️ Iniciar notificación"
+        android:backgroundTint="@color/accent_green"
+        android:textColor="@android:color/white"
+        android:enabled="false" />
+
+</LinearLayout>
