@@ -123,7 +123,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         tvStatus.text = statusLines
-        btnToggleMonitor.text = if (serviceRunning) "⏹ Detener notificación" else "▶️ Iniciar notificación"
+        btnToggleMonitor.text = if (serviceRunning) "⏹ Desactivar monitor" else "▶️ Activar monitor"
         btnToggleMonitor.isEnabled = overlayOk && accessibilityOk
     }
 

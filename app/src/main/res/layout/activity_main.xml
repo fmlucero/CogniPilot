@@ -87,7 +87,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Paso 3 — Notificación persistente (opcional)"
+        android:text="Paso 3 — Activar monitor"
         android:textSize="13sp"
         android:textColor="@color/text_secondary"
         android:paddingBottom="6dp" />
@@ -96,7 +96,7 @@
         android:id="@+id/btnToggleMonitor"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:text="▶️ Iniciar notificación"
+        android:text="▶️ Activar monitor"
         android:backgroundTint="@color/accent_green"
         android:textColor="@android:color/white"
         android:enabled="false" />

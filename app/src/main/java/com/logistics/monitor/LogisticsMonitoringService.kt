@@ -33,6 +33,9 @@ class LogisticsMonitoringService : Service() {
         isRunning = true
         Log.i(TAG, "✅ LogisticsMonitoringService creado")
         createNotificationChannel()
+        // Reset del accessibility para que el cartel naranja vuelva a aparecer
+        // la próxima vez que el usuario entre a Envíos SC Pack.
+        LogisticsAccessibilityService.resetMonitorState()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

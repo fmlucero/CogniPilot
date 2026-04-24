@@ -38,6 +38,18 @@ class LogisticsAccessibilityService : AccessibilityService() {
 
         var isServiceConnected = false
             private set
+
+        @Volatile
+        private var instance: LogisticsAccessibilityService? = null
+
+        /**
+         * Llamado desde el ForegroundService al iniciarse: limpia overlays y
+         * resetea flags para que el cartel naranja vuelva a salir cuando el
+         * usuario entre nuevamente a Envíos SC Pack.
+         */
+        fun resetMonitorState() {
+            instance?.resetState()
+        }
     }
 
     private lateinit var overlayManager: OverlayManager
@@ -55,6 +67,7 @@ class LogisticsAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         overlayManager = OverlayManager(this)
         isServiceConnected = true
+        instance = this
 
         Log.i(TAG, "✅ Servicio de accesibilidad CONECTADO")
         mainHandler.post {
@@ -82,6 +95,7 @@ class LogisticsAccessibilityService : AccessibilityService() {
         super.onDestroy()
         if (::overlayManager.isInitialized) overlayManager.removeAllOverlays()
         isServiceConnected = false
+        instance = null
         Log.i(TAG, "🔴 Servicio destruido")
     }
 
@@ -91,6 +105,13 @@ class LogisticsAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val pkg = event.packageName?.toString() ?: return
+
+        // Si el monitor está desactivado desde la app principal, no mostramos
+        // overlays — el servicio sigue escuchando pero en modo silencioso.
+        if (!LogisticsMonitoringService.isRunning) {
+            if (targetAppActive || warningShown || blockingShown) resetState()
+            return
+        }
 
         // El target app dejó de estar en primer plano → limpiar todo
         if (pkg != TARGET_PACKAGE) {
