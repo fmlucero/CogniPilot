@@ -52,12 +52,14 @@ class ScheduleMessagingService : FirebaseMessagingService() {
         }
 
         val snapshot = ScheduleSnapshot(
-            enabled = data["enabled"]?.toBooleanStrictOrNull() ?: false,
+            enabled = data["enabled"].toBoolean(),
             from = data["timeFrom"],
             to = data["timeTo"],
             tz = data["tz"],
             updatedAt = System.currentTimeMillis()
         )
+        
+        Log.i(TAG, "🔥 Parseado -> enabled=${snapshot.enabled}, from=${snapshot.from}, to=${snapshot.to}")
         ScheduleRepository(this).save(snapshot)
 
         showUpdateNotification(snapshot)
