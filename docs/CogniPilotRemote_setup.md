@@ -47,26 +47,28 @@ No hace falta ORM, ni base de datos relacional, ni framework de auth pesado.
 
 Un único registro en KV con esta forma:
 
-| Campo        | Tipo    | Ejemplo                            | Descripción                                                |
-|--------------|---------|------------------------------------|------------------------------------------------------------|
-| `enabled`    | bool    | `true`                             | Si está en `false` la app no aplica restricción horaria.   |
-| `from`       | string  | `"08:00"`                          | Inicio del rango permitido, formato `HH:mm`, 24h.          |
-| `to`         | string  | `"18:00"`                          | Fin del rango permitido. Puede cruzar medianoche.          |
-| `tz`         | string  | `"America/Argentina/Buenos_Aires"` | Timezone IANA (la app la usa para evaluar localmente).     |
-| `updatedAt`  | number  | `1714000000000`                    | Epoch ms del último cambio (auditoría).                    |
-| `updatedBy`  | string  | `"facu"`                           | Usuario que hizo el cambio (auditoría).                    |
+| Campo       | Tipo   | Ejemplo                            | Descripción                                              |
+| ----------- | ------ | ---------------------------------- | -------------------------------------------------------- |
+| `enabled`   | bool   | `true`                             | Si está en `false` la app no aplica restricción horaria. |
+| `from`      | string | `"08:00"`                          | Inicio del rango permitido, formato `HH:mm`, 24h.        |
+| `to`        | string | `"18:00"`                          | Fin del rango permitido. Puede cruzar medianoche.        |
+| `tz`        | string | `"America/Argentina/Buenos_Aires"` | Timezone IANA (la app la usa para evaluar localmente).   |
+| `updatedAt` | number | `1714000000000`                    | Epoch ms del último cambio (auditoría).                  |
+| `updatedBy` | string | `"facu"`                           | Usuario que hizo el cambio (auditoría).                  |
 
 ---
 
 ## 4. Endpoints
 
 ### `GET /api/schedule`
+
 - Público, sin auth.
 - Devuelve el JSON del horario actual exactamente como está en KV.
 - La app Android lo usa como fallback si no recibe pushes (red mala, sin Google
   Play Services, primer arranque). No es el camino principal.
 
 ### `POST /api/schedule`
+
 - Protegido con auth (cookie de sesión válida o header `Authorization` con un
   token compartido — bastará con cookie del panel).
 - Recibe `{enabled, from, to, tz}`, valida formato, escribe en KV.
@@ -74,6 +76,7 @@ Un único registro en KV con esta forma:
 - Responde con el snapshot guardado más `updatedAt`.
 
 ### `POST /api/login` y `POST /api/logout`
+
 - Login con un único usuario (env vars `ADMIN_USER` y `ADMIN_PASSWORD_HASH` con
   bcrypt). Setea cookie `httpOnly` + `secure`.
 - Logout la limpia.
@@ -83,6 +86,7 @@ Un único registro en KV con esta forma:
 ## 5. Cómo enviar el push desde Vercel a la app
 
 El servicio FCM ya está integrado en la app Android (commit `6528a2d`):
+
 - `ScheduleMessagingService` recibe el mensaje, persiste el snapshot y muestra
   la notificación.
 - La app se suscribe al topic `schedule-updates` al iniciar.
@@ -128,12 +132,12 @@ Login en `/login` con form simple.
 
 Agregar en Project Settings → Environment Variables (Production + Preview):
 
-| Variable                          | Valor                                                                |
-|-----------------------------------|----------------------------------------------------------------------|
-| `FIREBASE_SERVICE_ACCOUNT_JSON`   | JSON completo de la service account, en una sola línea.              |
-| `ADMIN_USER`                      | Usuario del panel, ej `"facu"`.                                      |
-| `ADMIN_PASSWORD_HASH`             | bcrypt hash del password (no el password en texto plano).            |
-| `SESSION_SECRET`                  | Random 32+ bytes para firmar la cookie de sesión.                    |
+| Variable                                | Valor                                                          |
+| --------------------------------------- | -------------------------------------------------------------- |
+| `FIREBASE_SERVICE_ACCOUNT_JSON`         | JSON completo de la service account, en una sola línea.        |
+| `ADMIN_USER`                            | Usuario del panel, ej `"facu"`.                                |
+| `ADMIN_PASSWORD_HASH`                   | bcrypt hash del password (no el password en texto plano).      |
+| `SESSION_SECRET`                        | Random 32+ bytes para firmar la cookie de sesión.              |
 | `KV_REST_API_URL` y `KV_REST_API_TOKEN` | Vercel KV los autogenera al crear el store y los inyecta solo. |
 
 ---

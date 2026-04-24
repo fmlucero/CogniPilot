@@ -63,6 +63,9 @@ class ScheduleMessagingService : FirebaseMessagingService() {
         ScheduleRepository(this).save(snapshot)
 
         showUpdateNotification(snapshot)
+        
+        // Forza la re-evaluación inmediata de los carteles si la app de envíos está abierta
+        LogisticsAccessibilityService.reevaluateCurrentState()
     }
 
     private fun showUpdateNotification(snapshot: ScheduleSnapshot) {

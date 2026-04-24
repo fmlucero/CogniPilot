@@ -53,22 +53,19 @@ data class ScheduleSnapshot(
     val updatedAt: Long
 ) {
     /**
-     * Decide si los carteles deben mostrarse en este momento.
-     *  - enabled=false → sin restricción → mostrar siempre.
-     *  - enabled=true y now dentro del rango → horario permitido → silenciar.
-     *  - enabled=true y now fuera del rango → mostrar.
-     *  - Datos incompletos o tz inválida → fallback: mostrar (modo seguro).
+     * Evalúa si el momento actual está dentro del rango permitido configurado.
+     * Si los datos son inválidos, retorna false por seguridad.
      */
-    fun shouldShowOverlays(now: ZonedDateTime = ZonedDateTime.now()): Boolean {
-        if (!enabled) return true
-        val from = from ?: return true
-        val to = to ?: return true
+    fun isNowInPermittedRange(now: ZonedDateTime = ZonedDateTime.now()): Boolean {
+        if (!enabled) return false
+        val from = from ?: return false
+        val to = to ?: return false
 
-        val zone = runCatching { ZoneId.of(tz ?: "UTC") }.getOrNull() ?: return true
+        val zone = runCatching { ZoneId.of(tz ?: "UTC") }.getOrNull() ?: return false
         val nowInZone = now.withZoneSameInstant(zone).toLocalTime()
 
-        val fromTime = runCatching { LocalTime.parse(from, FORMATTER) }.getOrNull() ?: return true
-        val toTime = runCatching { LocalTime.parse(to, FORMATTER) }.getOrNull() ?: return true
+        val fromTime = runCatching { LocalTime.parse(from, FORMATTER) }.getOrNull() ?: return false
+        val toTime = runCatching { LocalTime.parse(to, FORMATTER) }.getOrNull() ?: return false
 
         val inside = if (fromTime.isBefore(toTime)) {
             // Rango normal: ej 08:00 → 18:00
@@ -77,7 +74,7 @@ data class ScheduleSnapshot(
             // Rango que cruza medianoche: ej 22:00 → 06:00
             !nowInZone.isBefore(fromTime) || nowInZone.isBefore(toTime)
         }
-        return !inside
+        return inside
     }
 
     companion object {

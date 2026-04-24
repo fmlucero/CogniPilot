@@ -50,6 +50,14 @@ class LogisticsAccessibilityService : AccessibilityService() {
         fun resetMonitorState() {
             instance?.resetState()
         }
+
+        /**
+         * Llamado desde ScheduleMessagingService cuando llega un nuevo horario.
+         * Fuerza una re-evaluación inmediata de los overlays si la app está en pantalla.
+         */
+        fun reevaluateCurrentState() {
+            instance?.reevaluateState()
+        }
     }
 
     private lateinit var overlayManager: OverlayManager
@@ -108,16 +116,18 @@ class LogisticsAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val pkg = event.packageName?.toString() ?: return
 
-        // Si el monitor está desactivado desde la app principal, no mostramos
-        // overlays — el servicio sigue escuchando pero en modo silencioso.
-        if (!LogisticsMonitoringService.isRunning) {
-            if (targetAppActive || warningShown || blockingShown) resetState()
-            return
+        val snapshot = scheduleRepository.load()
+        
+        // Lógica de Prioridad:
+        // 1. Si hay restricción remota (enabled=true), ella manda (bloquea fuera de horario, permite dentro).
+        // 2. Si NO hay restricción remota, manda el switch local.
+        val shouldBlock = if (snapshot.enabled) {
+            !snapshot.isNowInPermittedRange()
+        } else {
+            LogisticsMonitoringService.isRunning
         }
 
-        // Gate horario: si estamos dentro del rango permitido por el supervisor,
-        // tampoco mostramos carteles (la app target funciona normal).
-        if (!scheduleRepository.load().shouldShowOverlays()) {
+        if (!shouldBlock) {
             if (targetAppActive || warningShown || blockingShown) resetState()
             return
         }
@@ -259,5 +269,33 @@ class LogisticsAccessibilityService : AccessibilityService() {
         warningShown = false
         blockingShown = false
         mainHandler.post { overlayManager.removeAllOverlays() }
+    }
+
+    private fun reevaluateState() {
+        mainHandler.post {
+            val root = rootInActiveWindow
+            if (root?.packageName?.toString() == TARGET_PACKAGE) {
+                val snapshot = scheduleRepository.load()
+                val shouldBlock = if (snapshot.enabled) {
+                    !snapshot.isNowInPermittedRange()
+                } else {
+                    LogisticsMonitoringService.isRunning
+                }
+
+                if (shouldBlock) {
+                    targetAppActive = true
+                    if (!warningShown && !blockingShown) {
+                        warningShown = true
+                        overlayManager.showWarningOverlay(
+                            title = "🚚 ENVÍOS SC PACK ABIERTO",
+                            message = "Restricción horaria actualizada. Esperá la hora correcta antes de escanear.",
+                            onDismiss = { Log.i(TAG, "Overlay cerrado") }
+                        )
+                    }
+                } else {
+                    resetState()
+                }
+            }
+        }
     }
 }
