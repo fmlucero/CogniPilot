@@ -19,3 +19,7 @@ local.properties
 
 # Build outputs
 app/build/
+
+# Firebase config (provisto en CI vía secret base64)
+app/google-services.json
+

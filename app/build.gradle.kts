@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -8,7 +9,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.logistics.monitor"
+        applicationId = "com.cognipilot.cognipilot"
         minSdk = 21
         targetSdk = 34
         versionCode = 1
@@ -24,7 +25,8 @@ android {
             )
         }
         debug {
-            applicationIdSuffix = ".debug"
+            // Sin applicationIdSuffix: debug y release comparten package
+            // así un único registro en Firebase cubre ambos build types.
             isDebuggable = true
         }
     }
@@ -47,4 +49,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+
+    // Firebase
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 }

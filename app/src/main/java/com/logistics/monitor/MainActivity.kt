@@ -9,6 +9,7 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.firebase.messaging.FirebaseMessaging
 
 /**
  * Pantalla principal del Monitor de Logística.
@@ -24,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "MainActivity"
         private const val REQUEST_OVERLAY = 1001
+        private const val SCHEDULE_TOPIC = "schedule-updates"
     }
 
     private lateinit var tvStatus: TextView
@@ -41,7 +43,19 @@ class MainActivity : AppCompatActivity() {
         btnOpenAccessibility = findViewById(R.id.btnOpenAccessibility)
 
         setupButtons()
+        subscribeToScheduleTopic()
         Log.i(TAG, "MainActivity creado")
+    }
+
+    private fun subscribeToScheduleTopic() {
+        FirebaseMessaging.getInstance().subscribeToTopic(SCHEDULE_TOPIC)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    Log.i(TAG, "✅ Suscripto a topic $SCHEDULE_TOPIC")
+                } else {
+                    Log.w(TAG, "❌ No se pudo suscribir al topic", task.exception)
+                }
+            }
     }
 
     override fun onResume() {
