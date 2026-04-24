@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  # Usar Node.js 24 para todas las actions (fix deprecation warning)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     name: Build & Upload APK
@@ -22,35 +26,19 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
 
-      # 3. Cache de Gradle para builds más rápidos
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
+      # 3. Instalar Gradle 8.7 directamente (no requiere gradle-wrapper.jar)
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/libs.versions.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          gradle-version: '8.7'
+          cache-read-only: false
 
-      # 4. Descargar gradle-wrapper.jar (binario no commiteado)
-      - name: Download gradle-wrapper.jar
-        run: |
-          mkdir -p gradle/wrapper
-          curl -L -o gradle/wrapper/gradle-wrapper.jar \
-            https://github.com/gradle/gradle/raw/v8.7.0/gradle/wrapper/gradle-wrapper.jar
-
-      # 5. Dar permisos de ejecución al wrapper
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      # 6. Build del APK de debug (sin firma, listo para instalar en modo debug)
+      # 4. Build del APK de debug
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace
 
-      # 7. Subir el APK como artifact descargable desde GitHub
+      # 5. Subir el APK como artifact descargable desde GitHub
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -59,7 +47,7 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      # 8. Mostrar info del APK en el log
+      # 6. Mostrar info del APK en el log
       - name: APK Info
         run: |
           echo "✅ Build completado"
