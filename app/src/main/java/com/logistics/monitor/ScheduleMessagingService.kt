@@ -16,8 +16,8 @@ import com.google.firebase.messaging.RemoteMessage
  * Payload esperado (data message):
  *  - type: "schedule_update"
  *  - enabled: "true" | "false"
- *  - from: "HH:mm"   (ej: "08:00")
- *  - to: "HH:mm"     (ej: "18:00")
+ *  - timeFrom: "HH:mm"   (ej: "08:00")
+ *  - timeTo: "HH:mm"     (ej: "18:00")
  *  - tz: IANA tz name (ej: "America/Argentina/Buenos_Aires")
  *
  * Acción: persiste el snapshot en SharedPreferences y dispara una notificación
@@ -53,8 +53,8 @@ class ScheduleMessagingService : FirebaseMessagingService() {
 
         val snapshot = ScheduleSnapshot(
             enabled = data["enabled"]?.toBooleanStrictOrNull() ?: false,
-            from = data["from"],
-            to = data["to"],
+            from = data["timeFrom"],
+            to = data["timeTo"],
             tz = data["tz"],
             updatedAt = System.currentTimeMillis()
         )
