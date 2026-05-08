@@ -4,14 +4,16 @@
 
     eventTypes: qué tipos de eventos escuchar
     - typeWindowStateChanged: cuando cambia la pantalla/actividad activa
-    - typeWindowContentChanged: cuando cambia el contenido (nueva lista, botón aparece, etc.)
     - typeViewClicked: cuando el usuario toca algo
 
-    packageNames: SOLO escuchamos com.mercadoenvios.logistics
-    → esto es crucial para no gastar batería en otras apps
+    Sin packageNames: el OS nos manda eventos de TODAS las apps. El filtrado
+    real lo hacemos en código (onAccessibilityEvent). En modo "solo SC Pack"
+    descartamos los eventos externos; en modo global los reportamos en gris.
+    Esto evita la quirk de Android donde cambiar packageNames en runtime
+    requiere desactivar/reactivar el servicio para que surta efecto.
 
     flags:
-    - flagReportViewIds: incluye el ID de recurso de cada vista (ej: "btn_scan_qr")
+    - flagReportViewIds: incluye el ID de recurso de cada vista
     - flagRetrieveInteractiveWindows: acceso a TODAS las ventanas del sistema
 -->
 <accessibility-service
@@ -21,5 +23,4 @@
     android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"
     android:notificationTimeout="100"
-    android:packageNames="com.mercadoenvios.logistics"
     android:description="@string/accessibility_service_description" />

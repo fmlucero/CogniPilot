@@ -108,21 +108,22 @@ class LogisticsAccessibilityService : AccessibilityService() {
             flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
                     AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             notificationTimeout = 100
-            // Filtro de packages según el toggle "modo global"
-            packageNames = if (globalModeRepository.isEnabled()) null else arrayOf(TARGET_PACKAGE)
+            // Siempre null: el OS nos manda eventos de TODAS las apps. Filtramos
+            // por package en código (`onAccessibilityEvent`). Esto evita la
+            // quirk de Android donde cambiar packageNames en runtime requiere
+            // desactivar/reactivar el servicio para tomar efecto.
+            packageNames = null
         }
         serviceInfo = info
+        Log.i(TAG, "📡 packageNames=null (filtro en código). Modo global: ${globalModeRepository.isEnabled()}")
     }
 
     /**
-     * Reconfigura el filtro de packages al togglear modo global.
-     * Si enabled=true → null (escucha todas las apps).
-     * Si enabled=false → solo SC Pack.
+     * Llamado al togglear "Modo global". Como el filtrado ahora es por código,
+     * no hay que reconfigurar serviceInfo — el cambio se aplica al próximo
+     * evento. Solo logueamos.
      */
     private fun configurePackageFilter(enabled: Boolean) {
-        val current = serviceInfo ?: return
-        current.packageNames = if (enabled) null else arrayOf(TARGET_PACKAGE)
-        serviceInfo = current
         Log.i(TAG, "🌐 Modo global ${if (enabled) "ACTIVADO (todas las apps)" else "DESACTIVADO (solo SC Pack)"}")
     }
 
