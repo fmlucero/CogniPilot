@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git commit --amend -m ' *)",
+      "Bash(gh auth *)",
+      "PowerShell(Get-Command *)",
+      "Bash(dir F:ProysLogisticsMonitorKotlin *)",
+      "Bash(npx --no-install tsc --noEmit)",
+      "Bash(npx --prefix \"F:/Proys/cognipilot-remote\" --no-install tsc --noEmit -p \"F:/Proys/cognipilot-remote\")",
+      "PowerShell($out = & npx --prefix F:\\\\Proys\\\\cognipilot-remote --no-install tsc --noEmit -p F:\\\\Proys\\\\cognipilot-remote 2>&1; $out | Select-Object -First 100; \"EXIT=$LASTEXITCODE\")",
+      "Bash(npx --prefix F:/Proys/cognipilot-remote --no-install eslint F:/Proys/cognipilot-remote/lib/events.ts F:/Proys/cognipilot-remote/app/api/events/route.ts)",
+      "PowerShell(Set-Location F:\\\\Proys\\\\cognipilot-remote; $out = & npx --no-install eslint app/api/events/route.ts lib/events.ts app/admin/page.tsx 2>&1; $out | Select-Object -First 100; \"EXIT=$LASTEXITCODE\")"
+    ]
+  }
+}

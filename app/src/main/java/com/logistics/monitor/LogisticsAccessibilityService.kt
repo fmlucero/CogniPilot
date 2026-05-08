@@ -167,6 +167,11 @@ class LogisticsAccessibilityService : AccessibilityService() {
         val screenName = event.className?.toString()?.substringAfterLast('.') ?: "App"
         Log.i(TAG, "🚚 ENVÍOS SC PACK ABIERTO — pantalla: $screenName")
 
+        val snap = scheduleRepository.load()
+        val inSchedule = if (snap.enabled) snap.isNowInPermittedRange() else null
+        EventReporter.report(this, EventReporter.TYPE_APP_OPENED, screenName = screenName, inSchedule = inSchedule)
+        EventReporter.report(this, EventReporter.TYPE_WARNING_SHOWN, screenName = screenName, inSchedule = inSchedule)
+
         mainHandler.post {
             overlayManager.showWarningOverlay(
                 title = "🚚 ENVÍOS SC PACK ABIERTO",
@@ -235,6 +240,15 @@ class LogisticsAccessibilityService : AccessibilityService() {
 
         Log.i(TAG, "🚫 BLOQUEO QR — keywords: $detectedKeywords")
 
+        val snap = scheduleRepository.load()
+        val inSchedule = if (snap.enabled) snap.isNowInPermittedRange() else null
+        EventReporter.report(
+            this,
+            EventReporter.TYPE_SCAN_DETECTED,
+            keywords = detectedKeywords,
+            inSchedule = inSchedule,
+        )
+
         mainHandler.post {
             overlayManager.showBlockingOverlay(
                 title = "🚫 ESCANEO QR DETECTADO",
@@ -242,6 +256,12 @@ class LogisticsAccessibilityService : AccessibilityService() {
                 onContinue = {
                     Log.w(TAG, "⚠️ Usuario eligió CONTINUAR con el escaneo")
                     blockingShown = false
+                    EventReporter.report(
+                        this,
+                        EventReporter.TYPE_USER_CONTINUED,
+                        keywords = detectedKeywords,
+                        inSchedule = inSchedule,
+                    )
                     mainHandler.post {
                         Toast.makeText(this, "⚠️ Escaneo permitido por el usuario", Toast.LENGTH_LONG).show()
                     }
@@ -249,6 +269,12 @@ class LogisticsAccessibilityService : AccessibilityService() {
                 onCancel = {
                     Log.i(TAG, "✅ Usuario canceló el escaneo — disparando back global")
                     blockingShown = false
+                    EventReporter.report(
+                        this,
+                        EventReporter.TYPE_USER_CANCELLED,
+                        keywords = detectedKeywords,
+                        inSchedule = inSchedule,
+                    )
                     mainHandler.post {
                         Toast.makeText(this, "✅ Escaneo cancelado correctamente", Toast.LENGTH_SHORT).show()
                     }
