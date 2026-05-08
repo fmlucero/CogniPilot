@@ -99,6 +99,32 @@
         android:text="▶️ Activar monitor"
         android:backgroundTint="@color/accent_green"
         android:textColor="@android:color/white"
-        android:enabled="false" />
+        android:enabled="false"
+        android:layout_marginBottom="24dp" />
+
+    <!-- Modo global -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Modo global (todas las apps)"
+        android:textSize="13sp"
+        android:textColor="@color/text_secondary"
+        android:paddingBottom="6dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Cuando está ON, además de SC Pack se reportan eventos de cualquier app del cel (en gris en el panel web)."
+        android:textSize="11sp"
+        android:textColor="@color/text_secondary"
+        android:paddingBottom="6dp" />
+
+    <Button
+        android:id="@+id/btnToggleGlobal"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="🌐 Modo global: OFF"
+        android:backgroundTint="@color/text_secondary"
+        android:textColor="@android:color/white" />
 
 </LinearLayout>

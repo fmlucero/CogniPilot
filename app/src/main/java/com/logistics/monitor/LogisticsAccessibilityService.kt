@@ -58,15 +58,30 @@ class LogisticsAccessibilityService : AccessibilityService() {
         fun reevaluateCurrentState() {
             instance?.reevaluateState()
         }
+
+        /**
+         * Llamado desde MainActivity al togglear "Modo global". Reconfigura
+         * serviceInfo.packageNames en runtime para escuchar todas las apps
+         * (null) o solo SC Pack.
+         */
+        fun applyGlobalMode(enabled: Boolean) {
+            instance?.configurePackageFilter(enabled)
+        }
     }
 
     private lateinit var overlayManager: OverlayManager
     private lateinit var scheduleRepository: ScheduleRepository
+    private lateinit var globalModeRepository: GlobalModeRepository
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var warningShown = false
     private var blockingShown = false
     private var targetAppActive = false
+
+    // Debounce de global_app_opened por package (evita spam en navegación interna)
+    private val lastGlobalOpenPerPkg = mutableMapOf<String, Long>()
+    private val GLOBAL_OPEN_DEBOUNCE_MS = 2_000L
+    private val MAX_GLOBAL_TEXTS = 8
 
     // ─────────────────────────────────────────────────────────────────────────
     // Ciclo de vida
@@ -76,6 +91,7 @@ class LogisticsAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         overlayManager = OverlayManager(this)
         scheduleRepository = ScheduleRepository(this)
+        globalModeRepository = GlobalModeRepository(this)
         isServiceConnected = true
         instance = this
 
@@ -92,8 +108,22 @@ class LogisticsAccessibilityService : AccessibilityService() {
             flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
                     AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             notificationTimeout = 100
+            // Filtro de packages según el toggle "modo global"
+            packageNames = if (globalModeRepository.isEnabled()) null else arrayOf(TARGET_PACKAGE)
         }
         serviceInfo = info
+    }
+
+    /**
+     * Reconfigura el filtro de packages al togglear modo global.
+     * Si enabled=true → null (escucha todas las apps).
+     * Si enabled=false → solo SC Pack.
+     */
+    private fun configurePackageFilter(enabled: Boolean) {
+        val current = serviceInfo ?: return
+        current.packageNames = if (enabled) null else arrayOf(TARGET_PACKAGE)
+        serviceInfo = current
+        Log.i(TAG, "🌐 Modo global ${if (enabled) "ACTIVADO (todas las apps)" else "DESACTIVADO (solo SC Pack)"}")
     }
 
     override fun onInterrupt() {
@@ -116,8 +146,23 @@ class LogisticsAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val pkg = event.packageName?.toString() ?: return
 
+        // Modo global: si la app es DISTINTA a SC Pack y el toggle está activo,
+        // reportamos el evento "en gris" sin tocar overlays ni lógica de bloqueo.
+        if (pkg != TARGET_PACKAGE) {
+            if (globalModeRepository.isEnabled()) {
+                handleGlobalEvent(event, pkg)
+            }
+            // El target app dejó de estar en primer plano → limpiar overlays
+            if (targetAppActive) {
+                Log.d(TAG, "App target en segundo plano (pkg actual=$pkg) — reseteando")
+                resetState()
+            }
+            return
+        }
+
+        // ── Desde acá: pkg == TARGET_PACKAGE ──
         val snapshot = scheduleRepository.load()
-        
+
         // Lógica de Prioridad:
         // 1. Si hay restricción remota (enabled=true), ella manda (bloquea fuera de horario, permite dentro).
         // 2. Si NO hay restricción remota, manda el switch local.
@@ -132,15 +177,6 @@ class LogisticsAccessibilityService : AccessibilityService() {
             return
         }
 
-        // El target app dejó de estar en primer plano → limpiar todo
-        if (pkg != TARGET_PACKAGE) {
-            if (targetAppActive) {
-                Log.d(TAG, "App target en segundo plano (pkg actual=$pkg) — reseteando")
-                resetState()
-            }
-            return
-        }
-
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 if (!targetAppActive) {
@@ -152,6 +188,78 @@ class LogisticsAccessibilityService : AccessibilityService() {
                 if (targetAppActive) {
                     checkClickedNode(event)
                 }
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Modo global: eventos de apps externas a SC Pack
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun handleGlobalEvent(event: AccessibilityEvent, pkg: String) {
+        when (event.eventType) {
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                val now = System.currentTimeMillis()
+                val last = lastGlobalOpenPerPkg[pkg] ?: 0L
+                if (now - last < GLOBAL_OPEN_DEBOUNCE_MS) return
+                lastGlobalOpenPerPkg[pkg] = now
+
+                val screenName = event.className?.toString()?.substringAfterLast('.')
+                val texts = mutableListOf<String>()
+                rootInActiveWindow?.let { collectVisibleTexts(it, texts, MAX_GLOBAL_TEXTS) }
+
+                Log.i(TAG, "🌐 [GLOBAL] App abierta: $pkg ($screenName) — ${texts.size} textos")
+                EventReporter.report(
+                    this,
+                    EventReporter.TYPE_GLOBAL_APP_OPENED,
+                    appPackage = pkg,
+                    screenName = screenName,
+                    screenText = texts.takeIf { it.isNotEmpty() },
+                )
+            }
+            AccessibilityEvent.TYPE_VIEW_CLICKED -> {
+                val texts = mutableListOf<String>()
+                event.text?.forEach { it?.toString()?.trim()?.takeIf { s -> s.isNotBlank() }?.let(texts::add) }
+                event.contentDescription?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let(texts::add)
+                event.source?.let { node ->
+                    collectClickTexts(node, texts)
+                    node.recycle()
+                }
+                Log.i(TAG, "🌐 [GLOBAL] Click en $pkg — textos=$texts")
+                EventReporter.report(
+                    this,
+                    EventReporter.TYPE_GLOBAL_CLICKED,
+                    appPackage = pkg,
+                    screenText = texts.distinct().take(MAX_GLOBAL_TEXTS).takeIf { it.isNotEmpty() },
+                )
+            }
+        }
+    }
+
+    private fun collectVisibleTexts(node: AccessibilityNodeInfo, out: MutableList<String>, max: Int) {
+        if (out.size >= max) return
+        node.text?.toString()?.trim()?.takeIf { it.isNotBlank() && it.length <= 80 }
+            ?.let { if (!out.contains(it)) out.add(it) }
+        if (out.size >= max) return
+        node.contentDescription?.toString()?.trim()?.takeIf { it.isNotBlank() && it.length <= 80 }
+            ?.let { if (!out.contains(it)) out.add(it) }
+
+        for (i in 0 until node.childCount) {
+            if (out.size >= max) return
+            node.getChild(i)?.let { child ->
+                collectVisibleTexts(child, out, max)
+                child.recycle()
+            }
+        }
+    }
+
+    private fun collectClickTexts(node: AccessibilityNodeInfo, out: MutableList<String>) {
+        node.text?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let { if (!out.contains(it)) out.add(it) }
+        node.contentDescription?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let { if (!out.contains(it)) out.add(it) }
+        for (i in 0 until node.childCount) {
+            node.getChild(i)?.let { child ->
+                collectClickTexts(child, out)
+                child.recycle()
             }
         }
     }

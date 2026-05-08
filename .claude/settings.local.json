@@ -18,7 +18,9 @@
       "WebFetch(domain:cognipilot-remote.vercel.app)",
       "WebFetch(domain:cognipilot-remote-fmlucero.vercel.app)",
       "WebFetch(domain:cogni-pilot-remote.vercel.app)",
-      "WebFetch(domain:cognipilotremote.vercel.app)"
+      "WebFetch(domain:cognipilotremote.vercel.app)",
+      "PowerShell($out = & npx --prefix F:\\\\Proys\\\\cognipilot-remote --no-install tsc --noEmit -p F:\\\\Proys\\\\cognipilot-remote 2>&1; $out | Select-Object -First 80; \"EXIT=$LASTEXITCODE\")",
+      "PowerShell(Set-Location F:\\\\Proys\\\\cognipilot-remote; $out = & npx --no-install eslint app/admin/page.tsx app/api/events/route.ts lib/events.ts 2>&1; $out | Select-Object -First 60; \"EXIT=$LASTEXITCODE\")"
     ]
   }
 }

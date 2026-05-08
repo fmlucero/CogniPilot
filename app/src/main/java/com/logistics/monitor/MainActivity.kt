@@ -9,6 +9,7 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessaging
 
 /**
@@ -32,6 +33,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnToggleMonitor: Button
     private lateinit var btnConfigureOverlay: Button
     private lateinit var btnOpenAccessibility: Button
+    private lateinit var btnToggleGlobal: Button
+    private lateinit var globalModeRepository: GlobalModeRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,9 +44,12 @@ class MainActivity : AppCompatActivity() {
         btnToggleMonitor = findViewById(R.id.btnToggleMonitor)
         btnConfigureOverlay = findViewById(R.id.btnConfigureOverlay)
         btnOpenAccessibility = findViewById(R.id.btnOpenAccessibility)
+        btnToggleGlobal = findViewById(R.id.btnToggleGlobal)
+        globalModeRepository = GlobalModeRepository(this)
 
         setupButtons()
         subscribeToScheduleTopic()
+        updateGlobalButtonLabel()
         Log.i(TAG, "MainActivity creado")
     }
 
@@ -94,6 +100,28 @@ class MainActivity : AppCompatActivity() {
                 startMonitoringService()
             }
         }
+
+        btnToggleGlobal.setOnClickListener {
+            val newState = !globalModeRepository.isEnabled()
+            globalModeRepository.setEnabled(newState)
+            LogisticsAccessibilityService.applyGlobalMode(newState)
+            updateGlobalButtonLabel()
+            Toast.makeText(
+                this,
+                if (newState) "🌐 Modo global ACTIVADO — todas las apps reportan"
+                else "🌐 Modo global desactivado — solo SC Pack",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    private fun updateGlobalButtonLabel() {
+        val enabled = globalModeRepository.isEnabled()
+        btnToggleGlobal.text = if (enabled) "🌐 Modo global: ON" else "🌐 Modo global: OFF"
+        btnToggleGlobal.backgroundTintList = ContextCompat.getColorStateList(
+            this,
+            if (enabled) R.color.accent_green else R.color.text_secondary
+        )
     }
 
     private fun startMonitoringService() {

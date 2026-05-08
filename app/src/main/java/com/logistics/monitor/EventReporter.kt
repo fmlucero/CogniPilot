@@ -35,6 +35,9 @@ object EventReporter {
     const val TYPE_SCAN_DETECTED = "scan_detected"
     const val TYPE_USER_CONTINUED = "user_continued"
     const val TYPE_USER_CANCELLED = "user_cancelled"
+    // Modo global (apps externas a SC Pack)
+    const val TYPE_GLOBAL_APP_OPENED = "global_app_opened"
+    const val TYPE_GLOBAL_CLICKED = "global_clicked"
 
     private val executor = Executors.newSingleThreadExecutor()
 
@@ -44,6 +47,8 @@ object EventReporter {
         screenName: String? = null,
         keywords: List<String>? = null,
         inSchedule: Boolean? = null,
+        appPackage: String? = null,
+        screenText: List<String>? = null,
     ) {
         val appCtx = context.applicationContext
         val baseUrl = appCtx.getString(R.string.backend_base_url).trimEnd('/')
@@ -55,6 +60,8 @@ object EventReporter {
             screenName?.takeIf { it.isNotBlank() }?.let { put("screenName", it) }
             inSchedule?.let { put("inSchedule", it) }
             keywords?.takeIf { it.isNotEmpty() }?.let { put("keywords", JSONArray(it)) }
+            appPackage?.takeIf { it.isNotBlank() }?.let { put("appPackage", it) }
+            screenText?.takeIf { it.isNotEmpty() }?.let { put("screenText", JSONArray(it)) }
         }.toString()
 
         executor.execute {
