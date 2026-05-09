@@ -153,10 +153,21 @@ class LogisticsAccessibilityService : AccessibilityService() {
             if (globalModeRepository.isEnabled()) {
                 handleGlobalEvent(event, pkg)
             }
-            // El target app dejó de estar en primer plano → limpiar overlays
-            if (targetAppActive) {
-                Log.d(TAG, "App target en segundo plano (pkg actual=$pkg) — reseteando")
-                resetState()
+            // Solo consideramos "SC Pack quedó atrás" si fue un cambio de ventana
+            // REAL Y la ventana activa ya no es SC Pack. Sin esto, nuestro propio
+            // overlay (cuando se muestra) o eventos de la status bar / IME
+            // resetean el estado y rompen el flujo del cartel rojo.
+            if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && targetAppActive) {
+                val activePkg = rootInActiveWindow?.packageName?.toString()
+                val isTransient = activePkg == null ||
+                    activePkg == TARGET_PACKAGE ||
+                    activePkg == packageName ||
+                    activePkg == "com.android.systemui" ||
+                    activePkg.contains("inputmethod")
+                if (!isTransient) {
+                    Log.d(TAG, "SC Pack en segundo plano (active=$activePkg) — reseteando")
+                    resetState()
+                }
             }
             return
         }
@@ -198,6 +209,9 @@ class LogisticsAccessibilityService : AccessibilityService() {
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun handleGlobalEvent(event: AccessibilityEvent, pkg: String) {
+        // No reportar nuestro propio app ni systemui/IME — ruido sin valor para la demo
+        if (pkg == packageName || pkg == "com.android.systemui" || pkg.contains("inputmethod")) return
+
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 val now = System.currentTimeMillis()
