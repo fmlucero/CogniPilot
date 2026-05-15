@@ -1,9 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.LogisticsMonitor" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/accent_blue</item>
-        <item name="colorPrimaryVariant">@color/accent_blue</item>
-        <item name="colorOnPrimary">@android:color/white</item>
-        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="colorPrimary">@color/cp_accent</item>
+        <item name="colorPrimaryVariant">@color/cp_accent</item>
+        <item name="colorOnPrimary">@color/cp_accent_text</item>
+        <item name="colorSecondary">@color/cp_accent</item>
+        <item name="colorOnSecondary">@color/cp_accent_text</item>
+        <item name="colorSurface">@color/cp_bg_elev</item>
+        <item name="colorOnSurface">@color/cp_text</item>
+        <item name="android:windowBackground">@color/cp_bg</item>
+        <item name="android:textColor">@color/cp_text</item>
+        <item name="android:textColorSecondary">@color/cp_text_muted</item>
+        <!-- Tipografía global: Barlow Condensed (Google Fonts downloadable) -->
+        <item name="android:fontFamily">@font/barlow_condensed</item>
+        <item name="fontFamily">@font/barlow_condensed</item>
     </style>
 </resources>

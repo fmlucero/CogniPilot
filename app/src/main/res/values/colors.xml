@@ -1,9 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="background_dark">#121212</color>
-    <color name="card_background">#1E1E1E</color>
-    <color name="text_primary">#EEEEEE</color>
-    <color name="text_secondary">#888888</color>
-    <color name="accent_blue">#2196F3</color>
-    <color name="accent_green">#4CAF50</color>
+    <!-- ─── Paleta CogniPilot (igual al panel web) ──────────────── -->
+    <color name="cp_bg">#17191C</color>
+    <color name="cp_bg_elev">#1E2126</color>
+    <color name="cp_bg_elev_2">#232730</color>
+    <color name="cp_border">#2A2D34</color>
+    <color name="cp_border_strong">#353941</color>
+
+    <color name="cp_accent">#FFE14D</color>
+    <color name="cp_accent_dim">#1AFFE14D</color>     <!-- 10% alpha -->
+    <color name="cp_accent_text">#17191C</color>      <!-- texto oscuro sobre botón amarillo -->
+
+    <color name="cp_text">#E9E3DA</color>
+    <color name="cp_text_strong">#F4EEE4</color>
+    <color name="cp_text_muted">#8C8C92</color>
+    <color name="cp_text_faint">#5F5F63</color>
+
+    <color name="cp_success">#6ED28A</color>
+    <color name="cp_warning">#F5A524</color>
+    <color name="cp_error">#EF4D4D</color>
+
+    <!-- ─── Aliases para compat con código existente ─────────────── -->
+    <color name="background_dark">@color/cp_bg</color>
+    <color name="card_background">@color/cp_bg_elev</color>
+    <color name="text_primary">@color/cp_text</color>
+    <color name="text_secondary">@color/cp_text_muted</color>
+    <color name="accent_blue">@color/cp_accent</color>
+    <color name="accent_green">@color/cp_success</color>
 </resources>

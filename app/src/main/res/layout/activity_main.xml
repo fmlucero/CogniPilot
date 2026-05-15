@@ -1,130 +1,190 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="20dp"
-    android:background="@color/background_dark">
+    android:background="@color/cp_bg"
+    android:fillViewport="true">
 
-    <!-- Header -->
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="🚚 Monitor de Logística"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:textColor="@color/text_primary"
-        android:gravity="center"
-        android:paddingBottom="8dp" />
+        android:orientation="vertical"
+        android:padding="20dp">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Envíos SC Pack · com.mercadoenvios.logistics"
-        android:textSize="12sp"
-        android:textColor="@color/text_secondary"
-        android:gravity="center"
-        android:paddingBottom="24dp" />
+        <!-- ─── Header (logo + brand) ───────────────────────────── -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_gravity="center_horizontal"
+            android:paddingTop="8dp"
+            android:paddingBottom="6dp">
 
-    <!-- Estado del sistema -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Estado del sistema"
-        android:textSize="14sp"
-        android:textColor="@color/text_secondary"
-        android:paddingBottom="8dp" />
+            <TextView
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:text="🚚"
+                android:textSize="22sp"
+                android:gravity="center"
+                android:background="@color/cp_accent_dim"
+                android:textColor="@color/cp_accent"
+                android:layout_marginEnd="12dp" />
 
-    <TextView
-        android:id="@+id/tvStatus"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Verificando..."
-        android:textSize="13sp"
-        android:textColor="@color/text_primary"
-        android:background="@color/card_background"
-        android:padding="16dp"
-        android:lineSpacingExtra="4dp"
-        android:layout_marginBottom="24dp" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
-    <!-- Paso 1 -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Paso 1 — Permiso de overlay"
-        android:textSize="13sp"
-        android:textColor="@color/text_secondary"
-        android:paddingBottom="6dp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="COGNIPILOT"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:fontFamily="@font/barlow_condensed_bold"
+                    android:letterSpacing="0.08"
+                    android:textColor="@color/cp_text_strong" />
 
-    <Button
-        android:id="@+id/btnConfigureOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="Configurar permiso overlay"
-        android:backgroundTint="@color/accent_blue"
-        android:textColor="@android:color/white"
-        android:layout_marginBottom="16dp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="MONITOR · SC PACK"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.18"
+                    android:textColor="@color/cp_text_faint" />
+            </LinearLayout>
+        </LinearLayout>
 
-    <!-- Paso 2 -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Paso 2 — Servicio de accesibilidad"
-        android:textSize="13sp"
-        android:textColor="@color/text_secondary"
-        android:paddingBottom="6dp" />
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/cp_border"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="20dp" />
 
-    <Button
-        android:id="@+id/btnOpenAccessibility"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="Abrir configuración de accesibilidad"
-        android:backgroundTint="@color/accent_blue"
-        android:textColor="@android:color/white"
-        android:layout_marginBottom="16dp" />
+        <!-- ─── Estado del sistema ──────────────────────────────── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="ESTADO DEL SISTEMA"
+            android:textSize="11sp"
+            android:letterSpacing="0.14"
+            android:textColor="@color/cp_text_faint"
+            android:paddingBottom="8dp" />
 
-    <!-- Paso 3 -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Paso 3 — Activar monitor"
-        android:textSize="13sp"
-        android:textColor="@color/text_secondary"
-        android:paddingBottom="6dp" />
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Verificando..."
+            android:textSize="14sp"
+            android:textColor="@color/cp_text"
+            android:background="@color/cp_bg_elev"
+            android:padding="16dp"
+            android:lineSpacingExtra="4dp"
+            android:layout_marginBottom="24dp" />
 
-    <Button
-        android:id="@+id/btnToggleMonitor"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="▶️ Activar monitor"
-        android:backgroundTint="@color/accent_green"
-        android:textColor="@android:color/white"
-        android:enabled="false"
-        android:layout_marginBottom="24dp" />
+        <!-- ─── Paso 1 ──────────────────────────────────────────── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="PASO 1 · PERMISO DE OVERLAY"
+            android:textSize="11sp"
+            android:letterSpacing="0.14"
+            android:textColor="@color/cp_text_faint"
+            android:paddingBottom="6dp" />
 
-    <!-- Modo global -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Modo global (todas las apps)"
-        android:textSize="13sp"
-        android:textColor="@color/text_secondary"
-        android:paddingBottom="6dp" />
+        <Button
+            android:id="@+id/btnConfigureOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Configurar permiso overlay"
+            android:textAllCaps="false"
+            android:fontFamily="@font/barlow_condensed_bold"
+            android:textSize="15sp"
+            android:letterSpacing="0.03"
+            android:backgroundTint="@color/cp_accent"
+            android:textColor="@color/cp_accent_text"
+            android:layout_marginBottom="16dp" />
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Cuando está ON, además de SC Pack se reportan eventos de cualquier app del cel (en gris en el panel web)."
-        android:textSize="11sp"
-        android:textColor="@color/text_secondary"
-        android:paddingBottom="6dp" />
+        <!-- ─── Paso 2 ──────────────────────────────────────────── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="PASO 2 · SERVICIO DE ACCESIBILIDAD"
+            android:textSize="11sp"
+            android:letterSpacing="0.14"
+            android:textColor="@color/cp_text_faint"
+            android:paddingBottom="6dp" />
 
-    <Button
-        android:id="@+id/btnToggleGlobal"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="🌐 Modo global: OFF"
-        android:backgroundTint="@color/text_secondary"
-        android:textColor="@android:color/white" />
+        <Button
+            android:id="@+id/btnOpenAccessibility"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Abrir configuración de accesibilidad"
+            android:textAllCaps="false"
+            android:fontFamily="@font/barlow_condensed_bold"
+            android:textSize="15sp"
+            android:letterSpacing="0.03"
+            android:backgroundTint="@color/cp_accent"
+            android:textColor="@color/cp_accent_text"
+            android:layout_marginBottom="16dp" />
 
-</LinearLayout>
+        <!-- ─── Paso 3 ──────────────────────────────────────────── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="PASO 3 · ACTIVAR MONITOR"
+            android:textSize="11sp"
+            android:letterSpacing="0.14"
+            android:textColor="@color/cp_text_faint"
+            android:paddingBottom="6dp" />
+
+        <Button
+            android:id="@+id/btnToggleMonitor"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="▶ Activar monitor"
+            android:textAllCaps="false"
+            android:fontFamily="@font/barlow_condensed_bold"
+            android:textSize="15sp"
+            android:letterSpacing="0.03"
+            android:backgroundTint="@color/cp_accent"
+            android:textColor="@color/cp_accent_text"
+            android:enabled="false"
+            android:layout_marginBottom="24dp" />
+
+        <!-- ─── Modo global ─────────────────────────────────────── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="MODO GLOBAL · TODAS LAS APPS"
+            android:textSize="11sp"
+            android:letterSpacing="0.14"
+            android:textColor="@color/cp_text_faint"
+            android:paddingBottom="6dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Cuando está ON, además de SC Pack se reportan eventos de cualquier app del cel (en gris en el panel web)."
+            android:textSize="12sp"
+            android:textColor="@color/cp_text_muted"
+            android:lineSpacingExtra="2dp"
+            android:paddingBottom="8dp" />
+
+        <Button
+            android:id="@+id/btnToggleGlobal"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="🌐 Modo global: OFF"
+            android:textAllCaps="false"
+            android:fontFamily="@font/barlow_condensed_bold"
+            android:textSize="15sp"
+            android:letterSpacing="0.03"
+            android:backgroundTint="@color/cp_bg_elev_2"
+            android:textColor="@color/cp_text" />
+
+    </LinearLayout>
+</ScrollView>

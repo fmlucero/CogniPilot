@@ -120,7 +120,13 @@ class MainActivity : AppCompatActivity() {
         btnToggleGlobal.text = if (enabled) "🌐 Modo global: ON" else "🌐 Modo global: OFF"
         btnToggleGlobal.backgroundTintList = ContextCompat.getColorStateList(
             this,
-            if (enabled) R.color.accent_green else R.color.text_secondary
+            if (enabled) R.color.cp_success else R.color.cp_bg_elev_2
+        )
+        btnToggleGlobal.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (enabled) R.color.cp_accent_text else R.color.cp_text,
+            )
         )
     }
 

@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Overlay 1: Advertencia informativa (1er cartel) -->
-<!-- Se muestra cuando com.mercadoenvios.logistics se abre -->
+<!-- Overlay 1: Advertencia informativa (1er cartel) — fondo amarillo CogniPilot -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#E6FF9800"
+    android:background="@color/cp_accent"
     android:padding="20dp"
     android:elevation="24dp">
 
@@ -16,7 +15,9 @@
         android:text="🚚 ENVÍOS SC PACK ABIERTO"
         android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="#1A1A1A"
+        android:fontFamily="@font/barlow_condensed_bold"
+        android:letterSpacing="0.04"
+        android:textColor="@color/cp_accent_text"
         android:gravity="center"
         android:paddingBottom="12dp" />
 
@@ -26,7 +27,7 @@
         android:layout_height="wrap_content"
         android:text="Recordá respetar los horarios programados."
         android:textSize="14sp"
-        android:textColor="#1A1A1A"
+        android:textColor="@color/cp_accent_text"
         android:lineSpacingExtra="4dp"
         android:paddingBottom="16dp" />
 
@@ -35,7 +36,10 @@
         android:layout_width="match_parent"
         android:layout_height="44dp"
         android:text="Entendido"
-        android:backgroundTint="#1A1A1A"
-        android:textColor="@android:color/white" />
+        android:textAllCaps="false"
+        android:fontFamily="@font/barlow_condensed_bold"
+        android:letterSpacing="0.03"
+        android:backgroundTint="@color/cp_accent_text"
+        android:textColor="@color/cp_accent" />
 
 </LinearLayout>

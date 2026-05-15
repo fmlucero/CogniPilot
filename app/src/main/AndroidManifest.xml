@@ -18,6 +18,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.LogisticsMonitor">
 
+        <!-- Preload de fuentes Google (Barlow Condensed) — evita parpadeo -->
+        <meta-data
+            android:name="preloaded_fonts"
+            android:resource="@array/preloaded_fonts" />
+
         <!-- Actividad principal -->
         <activity
             android:name=".MainActivity"

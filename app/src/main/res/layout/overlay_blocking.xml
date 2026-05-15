@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Overlay 2: Bloqueo interactivo (2do cartel) -->
-<!-- Se muestra cuando se detectan keywords de escaneo QR en pantalla -->
+<!-- Overlay 2: Bloqueo interactivo (2do cartel) — rojo CogniPilot -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#EDF44336"
+    android:background="#EDEF4D4D"
     android:padding="20dp"
     android:elevation="32dp">
 
@@ -16,7 +15,9 @@
         android:text="🚫 ESCANEO QR DETECTADO"
         android:textSize="20sp"
         android:textStyle="bold"
-        android:textColor="#FFFFFF"
+        android:fontFamily="@font/barlow_condensed_bold"
+        android:letterSpacing="0.04"
+        android:textColor="@color/cp_text_strong"
         android:gravity="center"
         android:paddingBottom="12dp" />
 
@@ -26,11 +27,10 @@
         android:layout_height="wrap_content"
         android:text="Se detectaron botones de escaneo en pantalla."
         android:textSize="13sp"
-        android:textColor="#FFEEEE"
+        android:textColor="@color/cp_text_strong"
         android:lineSpacingExtra="4dp"
         android:paddingBottom="20dp" />
 
-    <!-- Botones en fila -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -42,8 +42,11 @@
             android:layout_height="48dp"
             android:layout_weight="1"
             android:text="✅ Cancelar"
-            android:backgroundTint="#2E7D32"
-            android:textColor="@android:color/white"
+            android:textAllCaps="false"
+            android:fontFamily="@font/barlow_condensed_bold"
+            android:letterSpacing="0.03"
+            android:backgroundTint="@color/cp_success"
+            android:textColor="@color/cp_accent_text"
             android:layout_marginEnd="8dp" />
 
         <Button
@@ -51,9 +54,12 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:text="⚠️ Continuar"
-            android:backgroundTint="#37474F"
-            android:textColor="@android:color/white" />
+            android:text="⚠ Continuar"
+            android:textAllCaps="false"
+            android:fontFamily="@font/barlow_condensed_bold"
+            android:letterSpacing="0.03"
+            android:backgroundTint="@color/cp_bg"
+            android:textColor="@color/cp_text" />
 
     </LinearLayout>
 
