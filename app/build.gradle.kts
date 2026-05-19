@@ -52,6 +52,9 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    // HU-18 fase 4: cliente SSE para realtime push
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.sse)
 
     // Backport de java.time.* para minSdk 21
     coreLibraryDesugaring(libs.desugar.jdk.libs)

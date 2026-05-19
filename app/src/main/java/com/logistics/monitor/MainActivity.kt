@@ -44,6 +44,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var globalModeRepository: GlobalModeRepository
 
     private var foregroundPollJob: Job? = null
+    private lateinit var realtimeClient: RealtimeStreamClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,6 +62,8 @@ class MainActivity : AppCompatActivity() {
 
         // HU-18: schedule del worker periódico (background sync cada 15 min)
         ScheduleSyncWorker.schedulePeriodic(this)
+        // HU-18 fase 4: cliente SSE para realtime (latencia <100ms en foreground)
+        realtimeClient = RealtimeStreamClient(this)
 
         // Cuando el servicio cambia su estado (onCreate/onDestroy), refrescamos
         // la UI sin esperar a onResume.
@@ -75,11 +78,13 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         updateStatusDisplay()
         startForegroundPolling()
+        realtimeClient.connect()
     }
 
     override fun onPause() {
         super.onPause()
         stopForegroundPolling()
+        realtimeClient.disconnect()
     }
 
     override fun onDestroy() {

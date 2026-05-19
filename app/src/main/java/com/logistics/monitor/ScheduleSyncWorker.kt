@@ -44,12 +44,20 @@ class ScheduleSyncWorker(
         private const val PERIOD_MIN = 15L  // mínimo permitido por WorkManager
 
         /**
-         * Hace una sincronización puntual. Retorna true si detectó cambio
-         * respecto al snapshot local. Usado tanto desde el worker como desde
-         * el polling foreground en MainActivity.
+         * Hace una sincronización puntual: fetch /api/schedule + apply.
+         * Retorna true si detectó cambio. Usado por el worker y el polling.
          */
         suspend fun syncOnce(context: Context): Boolean {
             val remote = ScheduleApi.fetchSchedule(context) ?: return false
+            return applySnapshot(context, remote)
+        }
+
+        /**
+         * Aplica un snapshot remoto recibido por cualquier canal (polling o SSE).
+         * Compara con el local y si difiere persiste + notifica + re-evalúa.
+         * Retorna true si hubo cambio efectivo.
+         */
+        fun applySnapshot(context: Context, remote: ScheduleSnapshot): Boolean {
             val repo = ScheduleRepository(context)
             val local = repo.load()
 
