@@ -7,8 +7,9 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 /**
- * Cache local del horario permitido para escanear, sincronizado vía FCM
- * desde el panel remoto (CogniPilotRemote en Vercel).
+ * Cache local del horario permitido para escanear, sincronizado por polling
+ * desde el back FastAPI vía ScheduleSyncWorker (cada 15 min en background) y
+ * el polling foreground de MainActivity (cada 30s). HU-18 (sin FCM).
  *
  * Si no hay datos en cache (primera ejecución, sin red), enabled=false →
  * el monitor se comporta como si no hubiera restricción horaria.

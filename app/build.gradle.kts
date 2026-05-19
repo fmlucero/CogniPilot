@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.google.services)
 }
 
 android {
@@ -25,8 +24,6 @@ android {
             )
         }
         debug {
-            // Sin applicationIdSuffix: debug y release comparten package
-            // así un único registro en Firebase cubre ambos build types.
             isDebuggable = true
         }
     }
@@ -51,9 +48,10 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
 
-    // Firebase
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.messaging)
+    // HU-18: sync propio sin Firebase
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.kotlinx.coroutines.android)
 
     // Backport de java.time.* para minSdk 21
     coreLibraryDesugaring(libs.desugar.jdk.libs)

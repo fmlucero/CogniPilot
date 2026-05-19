@@ -10,7 +10,11 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.google.firebase.messaging.FirebaseMessaging
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * Pantalla principal del Monitor de Logística.
@@ -20,13 +24,16 @@ import com.google.firebase.messaging.FirebaseMessaging
  *  - Redirigir al usuario a la configuración de Accesibilidad
  *  - Mostrar estado actual del servicio (activo/inactivo)
  *  - Iniciar/detener el ForegroundService de notificación
+ *
+ * HU-18: programa el ScheduleSyncWorker (WorkManager, cada 15 min) y corre un
+ * polling de schedule cada 30s mientras la activity está en foreground.
  */
 class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
         private const val REQUEST_OVERLAY = 1001
-        private const val SCHEDULE_TOPIC = "schedule-updates"
+        private const val FOREGROUND_POLL_INTERVAL_MS = 30_000L
     }
 
     private lateinit var tvStatus: TextView
@@ -35,6 +42,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnOpenAccessibility: Button
     private lateinit var btnToggleGlobal: Button
     private lateinit var globalModeRepository: GlobalModeRepository
+
+    private var foregroundPollJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,8 +57,10 @@ class MainActivity : AppCompatActivity() {
         globalModeRepository = GlobalModeRepository(this)
 
         setupButtons()
-        subscribeToScheduleTopic()
         updateGlobalButtonLabel()
+
+        // HU-18: schedule del worker periódico (background sync cada 15 min)
+        ScheduleSyncWorker.schedulePeriodic(this)
 
         // Cuando el servicio cambia su estado (onCreate/onDestroy), refrescamos
         // la UI sin esperar a onResume.
@@ -60,26 +71,49 @@ class MainActivity : AppCompatActivity() {
         Log.i(TAG, "MainActivity creado")
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        // Evitar leak del callback al destruirse la activity
-        LogisticsMonitoringService.onStateChange = null
-    }
-
-    private fun subscribeToScheduleTopic() {
-        FirebaseMessaging.getInstance().subscribeToTopic(SCHEDULE_TOPIC)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Log.i(TAG, "✅ Suscripto a topic $SCHEDULE_TOPIC")
-                } else {
-                    Log.w(TAG, "❌ No se pudo suscribir al topic", task.exception)
-                }
-            }
-    }
-
     override fun onResume() {
         super.onResume()
         updateStatusDisplay()
+        startForegroundPolling()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        stopForegroundPolling()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        LogisticsMonitoringService.onStateChange = null
+    }
+
+    /**
+     * HU-18: polling de schedule mientras la activity está visible.
+     * Cuando detecta cambio respecto al snapshot local, dispara notif y
+     * fuerza re-evaluación del AccessibilityService.
+     */
+    private fun startForegroundPolling() {
+        foregroundPollJob?.cancel()
+        foregroundPollJob = lifecycleScope.launch {
+            // Primer poll inmediato al volver a foreground.
+            tickPoll()
+            while (isActive) {
+                delay(FOREGROUND_POLL_INTERVAL_MS)
+                tickPoll()
+            }
+        }
+    }
+
+    private fun stopForegroundPolling() {
+        foregroundPollJob?.cancel()
+        foregroundPollJob = null
+    }
+
+    private suspend fun tickPoll() {
+        val changed = ScheduleSyncWorker.syncOnce(applicationContext)
+        if (changed) {
+            Log.i(TAG, "📡 Polling detectó cambio de schedule")
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
