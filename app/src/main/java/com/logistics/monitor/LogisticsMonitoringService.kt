@@ -26,11 +26,19 @@ class LogisticsMonitoringService : Service() {
 
         var isRunning = false
             private set
+
+        /**
+         * Callback opcional invocado cuando isRunning cambia.
+         * MainActivity lo registra para refrescar la UI en tiempo real
+         * (sin tener que esperar a onResume).
+         */
+        var onStateChange: (() -> Unit)? = null
     }
 
     override fun onCreate() {
         super.onCreate()
         isRunning = true
+        onStateChange?.invoke()
         Log.i(TAG, "✅ LogisticsMonitoringService creado")
         createNotificationChannel()
         // Reset del accessibility para que el cartel naranja vuelva a aparecer
@@ -47,6 +55,7 @@ class LogisticsMonitoringService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
+        onStateChange?.invoke()
         Log.i(TAG, "🔴 LogisticsMonitoringService destruido")
     }
 

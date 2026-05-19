@@ -50,7 +50,20 @@ class MainActivity : AppCompatActivity() {
         setupButtons()
         subscribeToScheduleTopic()
         updateGlobalButtonLabel()
+
+        // Cuando el servicio cambia su estado (onCreate/onDestroy), refrescamos
+        // la UI sin esperar a onResume.
+        LogisticsMonitoringService.onStateChange = {
+            runOnUiThread { updateStatusDisplay() }
+        }
+
         Log.i(TAG, "MainActivity creado")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Evitar leak del callback al destruirse la activity
+        LogisticsMonitoringService.onStateChange = null
     }
 
     private fun subscribeToScheduleTopic() {
