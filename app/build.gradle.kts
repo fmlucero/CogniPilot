@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -9,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.cognipilot.cognipilot"
-        minSdk = 21
+        minSdk = 23   // HU-03: EncryptedSharedPreferences requiere API 23+
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -56,6 +57,14 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.okhttp.sse)
 
-    // Backport de java.time.* para minSdk 21
+    // HU-03: storage cifrado de tokens, persistencia local de ruta/reglas, JSON
+    implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.moshi.kotlin)
+    ksp(libs.moshi.codegen)
+
+    // Backport de java.time.* para minSdk 23
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 }
