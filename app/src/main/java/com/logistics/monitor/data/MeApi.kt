@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 
 /**
- * Cliente HTTP para los endpoints /api/me/* del back.
+ * Cliente HTTP para los endpoints /api/me/{ruta,reglas} del back.
  * Usa HttpClient (singleton) que ya tiene el AuthInterceptor.
  */
 class MeApi(private val context: Context) {

@@ -15,7 +15,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 /**
- * Cliente HTTP minimalista para los endpoints /api/auth/* del back.
+ * Cliente HTTP minimalista para los endpoints /api/auth/{login,refresh,logout} del back.
  *
  * Usa su propio OkHttpClient (sin AuthInterceptor) porque estos endpoints son
  * los que justamente emiten el token — meter el interceptor llevaría a loop.
