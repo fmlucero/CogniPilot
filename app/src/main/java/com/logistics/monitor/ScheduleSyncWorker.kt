@@ -108,5 +108,14 @@ class ScheduleSyncWorker(
             )
             Log.i(TAG, "📅 Worker periódico programado (cada $PERIOD_MIN min)")
         }
+
+        /**
+         * HU-03 — Cancelar el worker periódico al cerrar sesión.
+         * Sin sesión no hay token para autenticar el GET /api/schedule.
+         */
+        fun cancel(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+            Log.i(TAG, "🛑 Worker periódico cancelado (logout)")
+        }
     }
 }

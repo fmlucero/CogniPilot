@@ -2,6 +2,7 @@ package com.logistics.monitor
 
 import android.content.Context
 import android.util.Log
+import com.logistics.monitor.auth.AuthRepository
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -37,10 +38,17 @@ class RealtimeStreamClient(private val context: Context) {
 
     fun connect() {
         if (eventSource != null) return  // ya conectado
-        val baseUrl = context.applicationContext.getString(R.string.backend_base_url).trimEnd('/')
+        val appCtx = context.applicationContext
+        val token = AuthRepository.get(appCtx).tokens.getAccessToken()
+        if (token.isNullOrBlank()) {
+            Log.d(TAG, "⏸️ Sin sesión activa — no conectamos SSE")
+            return
+        }
+        val baseUrl = appCtx.getString(R.string.backend_base_url).trimEnd('/')
         val request = Request.Builder()
             .url("$baseUrl/api/realtime/stream")
             .header("Accept", "text/event-stream")
+            .header("Authorization", "Bearer $token")
             .build()
 
         eventSource = factory.newEventSource(request, listener)

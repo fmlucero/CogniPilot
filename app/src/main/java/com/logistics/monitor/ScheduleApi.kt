@@ -2,6 +2,7 @@ package com.logistics.monitor
 
 import android.content.Context
 import android.util.Log
+import com.logistics.monitor.auth.AuthRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -11,11 +12,9 @@ import java.net.URL
 /**
  * Cliente HTTP minimalista para consultar el endpoint GET /api/schedule del back.
  *
- * Reemplazo de Firebase Cloud Messaging (HU-18): en vez de recibir push, la app
- * pollea este endpoint en foreground (cada 30s desde MainActivity) y en
- * background (cada 15 min desde ScheduleSyncWorker).
- *
- * Endpoint público (sin auth) — alineado con el patrón actual de EventReporter.
+ * HU-18: polling en lugar de FCM (foreground 30s, background 15 min via WorkManager).
+ * HU-03: agrega Authorization Bearer. Si no hay sesión, devuelve null (la app
+ * en ese caso no debería estar pidiendo schedule — pero protegemos por las dudas).
  */
 object ScheduleApi {
 
@@ -26,10 +25,17 @@ object ScheduleApi {
 
     /**
      * Consulta el back y devuelve el snapshot actual del schedule, o null si
-     * la llamada falla por cualquier razón (sin red, 5xx, JSON inválido).
+     * la llamada falla por cualquier razón (sin red, sin sesión, 5xx, JSON inválido).
      */
     suspend fun fetchSchedule(context: Context): ScheduleSnapshot? = withContext(Dispatchers.IO) {
-        val baseUrl = context.applicationContext.getString(R.string.backend_base_url).trimEnd('/')
+        val appCtx = context.applicationContext
+        val token = AuthRepository.get(appCtx).tokens.getAccessToken()
+        if (token.isNullOrBlank()) {
+            Log.d(TAG, "⏸️ Sin sesión activa — saltando fetch de schedule")
+            return@withContext null
+        }
+
+        val baseUrl = appCtx.getString(R.string.backend_base_url).trimEnd('/')
         val url = "$baseUrl$PATH"
 
         var conn: HttpURLConnection? = null
@@ -39,6 +45,7 @@ object ScheduleApi {
                 connectTimeout = CONNECT_TIMEOUT_MS
                 readTimeout = READ_TIMEOUT_MS
                 setRequestProperty("Accept", "application/json")
+                setRequestProperty("Authorization", "Bearer $token")
             }
             val code = conn.responseCode
             if (code !in 200..299) {

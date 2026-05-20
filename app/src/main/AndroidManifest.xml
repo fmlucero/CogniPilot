@@ -23,17 +23,31 @@
             android:name="preloaded_fonts"
             android:resource="@array/preloaded_fonts" />
 
-        <!-- Actividad principal -->
+        <!-- HU-03: SplashActivity es el nuevo launcher; decide login vs main -->
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.SplashActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:theme="@style/Theme.LogisticsMonitor"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- HU-03: pantalla de login -->
+        <activity
+            android:name=".ui.LoginActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LogisticsMonitor"
+            android:label="@string/app_name" />
+
+        <!-- Actividad principal (ahora solo accesible con sesión) -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:label="@string/app_name" />
 
         <!-- Servicio de accesibilidad: NÚCLEO del monitoreo -->
         <service

@@ -11,6 +11,9 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.logistics.monitor.auth.AuthRepository
+import com.logistics.monitor.data.MeRepository
+import com.logistics.monitor.ui.SplashActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -37,6 +40,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var tvStatus: TextView
+    private lateinit var tvSession: TextView
+    private lateinit var btnLogout: Button
     private lateinit var btnToggleMonitor: Button
     private lateinit var btnConfigureOverlay: Button
     private lateinit var btnOpenAccessibility: Button
@@ -45,20 +50,25 @@ class MainActivity : AppCompatActivity() {
 
     private var foregroundPollJob: Job? = null
     private lateinit var realtimeClient: RealtimeStreamClient
+    private lateinit var meRepository: MeRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         tvStatus = findViewById(R.id.tvStatus)
+        tvSession = findViewById(R.id.tvSession)
+        btnLogout = findViewById(R.id.btnLogout)
         btnToggleMonitor = findViewById(R.id.btnToggleMonitor)
         btnConfigureOverlay = findViewById(R.id.btnConfigureOverlay)
         btnOpenAccessibility = findViewById(R.id.btnOpenAccessibility)
         btnToggleGlobal = findViewById(R.id.btnToggleGlobal)
         globalModeRepository = GlobalModeRepository(this)
+        meRepository = MeRepository(this)
 
         setupButtons()
         updateGlobalButtonLabel()
+        updateSessionDisplay()
 
         // HU-18: schedule del worker periódico (background sync cada 15 min)
         ScheduleSyncWorker.schedulePeriodic(this)
@@ -77,8 +87,14 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateStatusDisplay()
+        updateSessionDisplay()
         startForegroundPolling()
         realtimeClient.connect()
+        // Refresh de ruta/reglas en background — best effort, sin bloquear UI
+        lifecycleScope.launch {
+            val sync = meRepository.syncFromBackend()
+            if (sync.rutaOk || sync.reglasOk) updateSessionDisplay()
+        }
     }
 
     override fun onPause() {
@@ -164,6 +180,55 @@ class MainActivity : AppCompatActivity() {
                 else "🌐 Modo global desactivado — solo SC Pack",
                 Toast.LENGTH_LONG
             ).show()
+        }
+
+        btnLogout.setOnClickListener { onLogoutPressed() }
+    }
+
+    /**
+     * HU-03 — Logout: detiene servicios, borra tokens y DB, vuelve a SplashActivity.
+     */
+    private fun onLogoutPressed() {
+        lifecycleScope.launch {
+            if (LogisticsMonitoringService.isRunning) {
+                stopMonitoringService()
+            }
+            realtimeClient.disconnect()
+            stopForegroundPolling()
+            ScheduleSyncWorker.cancel(applicationContext)
+            AuthRepository.get(this@MainActivity).logout()
+            val intent = Intent(this@MainActivity, SplashActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            finish()
+        }
+    }
+
+    /**
+     * HU-03 — Pinta tarjeta de sesión: nombre + email del usuario + ruta cacheada.
+     */
+    private fun updateSessionDisplay() {
+        val tokens = AuthRepository.get(this).tokens
+        val nombre = tokens.getNombre() ?: "—"
+        val email = tokens.getEmail() ?: ""
+        val rol = tokens.getRol() ?: ""
+
+        lifecycleScope.launch {
+            val ruta = meRepository.getRutaCached()
+            val reglas = meRepository.getReglasCachedActivas()
+            val rutaTxt = if (ruta != null) {
+                val paradas = meRepository.getParadasCached(ruta.id)
+                "${ruta.nombre} (${ruta.fecha}) · ${paradas.size} paradas"
+            } else {
+                "Sin ruta asignada"
+            }
+            tvSession.text = buildString {
+                append("👤 ").append(nombre)
+                if (email.isNotEmpty()) append(" · ").append(email)
+                if (rol.isNotEmpty()) append("\n🎫 Rol: ").append(rol)
+                append("\n📍 ").append(rutaTxt)
+                append("\n📋 ").append(reglas.size).append(" reglas activas")
+            }
         }
     }
 
