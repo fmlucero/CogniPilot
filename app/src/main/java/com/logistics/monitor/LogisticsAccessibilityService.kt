@@ -83,6 +83,13 @@ class LogisticsAccessibilityService : AccessibilityService() {
     private val GLOBAL_OPEN_DEBOUNCE_MS = 2_000L
     private val MAX_GLOBAL_TEXTS = 8
 
+    // Debounce del par (app_opened + warning_shown) — Android emite múltiples
+    // WINDOW_STATE_CHANGED al abrir SC Pack (activity main, dialog, splash, etc),
+    // y entre transiciones el resetState() puede borrar el flag y disparar otra
+    // vez. Con este debounce, no emitimos los mismos eventos por <X seg.
+    private var lastTargetOpenedAt: Long = 0L
+    private val TARGET_OPENED_DEBOUNCE_MS = 5_000L
+
     // ─────────────────────────────────────────────────────────────────────────
     // Ciclo de vida
     // ─────────────────────────────────────────────────────────────────────────
@@ -285,6 +292,16 @@ class LogisticsAccessibilityService : AccessibilityService() {
 
     private fun onTargetAppOpened(event: AccessibilityEvent) {
         if (warningShown) return
+        // Debounce: si el AAS ya disparó el par app_opened+warning_shown hace
+        // <X segundos, no lo volvemos a disparar aunque el state se haya
+        // resetado por una transición intermedia. Evita los duplicados que
+        // aparecían con 1-2 seg de diferencia al abrir SC Pack.
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastTargetOpenedAt < TARGET_OPENED_DEBOUNCE_MS) {
+            warningShown = true
+            return
+        }
+        lastTargetOpenedAt = now
         warningShown = true
 
         val screenName = event.className?.toString()?.substringAfterLast('.') ?: "App"
