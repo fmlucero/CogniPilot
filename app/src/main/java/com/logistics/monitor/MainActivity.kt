@@ -11,6 +11,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.logistics.monitor.auth.AuthRepository
@@ -57,6 +58,7 @@ class MainActivity : AppCompatActivity() {
     // HU-41 — launcher para pedir permiso de ubicación.
     // Si el user concede, arrancamos el LocationReporter; si no, sigue todo
     // funcionando pero sin reporte GPS al back.
+    private var locationPermAskedThisSession = false
     private val locationPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
@@ -69,9 +71,39 @@ class MainActivity : AppCompatActivity() {
                 LocationReporter.start(this)
             }
         } else {
-            Toast.makeText(this, "⚠️ Sin permiso de ubicación, el supervisor no te verá en el mapa", Toast.LENGTH_LONG).show()
+            // Si rationale es false, el usuario marcó "no preguntes de nuevo".
+            // Lo redirigimos a configuración para que pueda otorgarlo manualmente.
+            val canShowRationale = ActivityCompat.shouldShowRequestPermissionRationale(
+                this, Manifest.permission.ACCESS_FINE_LOCATION
+            )
+            if (canShowRationale) {
+                Toast.makeText(this, "⚠️ Sin GPS el supervisor no te ve en el mapa", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "⚠️ Permiso denegado. Tap el botón \"Otorgar ubicación\" para ir a configuración.", Toast.LENGTH_LONG).show()
+            }
         }
         updateStatusDisplay()
+    }
+
+    /** HU-41 — pide el permiso una vez por sesión si todavía no fue concedido. */
+    private fun askLocationPermissionIfNeeded() {
+        if (locationPermAskedThisSession) return
+        if (LocationReporter.hasPermission(this)) return
+        locationPermAskedThisSession = true
+        locationPermLauncher.launch(arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        ))
+    }
+
+    /** Abre la pantalla de configuración de la app — útil cuando el user marcó
+     *  "no preguntes de nuevo" y necesita habilitar permisos manualmente. */
+    private fun openAppSettings() {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.parse("package:$packageName")
+        )
+        startActivity(intent)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -112,6 +144,9 @@ class MainActivity : AppCompatActivity() {
         updateSessionDisplay()
         startForegroundPolling()
         realtimeClient.connect()
+        // HU-41 — pedir permiso GPS proactivamente al volver al foreground.
+        // Una vez por sesión de la activity para no spamear al usuario.
+        askLocationPermissionIfNeeded()
         // Refresh de ruta/reglas en background — best effort, sin bloquear UI
         lifecycleScope.launch {
             val sync = meRepository.syncFromBackend()
