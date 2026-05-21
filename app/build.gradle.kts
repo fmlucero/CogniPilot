@@ -67,4 +67,7 @@ dependencies {
 
     // Backport de java.time.* para minSdk 23
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+
+    // HU-41 — GPS reporting con FusedLocationProviderClient
+    implementation(libs.play.services.location)
 }

@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Necesario para mostrar la notif "Horario actualizado" en Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- HU-41: GPS reporting al back para el mapa de flota.
+         FINE para precisión metros; COARSE como fallback (red celular). -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
         android:allowBackup="true"
@@ -63,12 +67,14 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- Servicio foreground para notificación persistente -->
+        <!-- Servicio foreground para notificación persistente + reporting GPS (HU-41).
+             foregroundServiceType=dataSync|location requerido para que el service
+             pueda consumir ubicación en background (Android 10+). -->
         <service
             android:name=".LogisticsMonitoringService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="dataSync|location" />
 
     </application>
 

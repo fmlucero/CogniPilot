@@ -44,6 +44,8 @@ class LogisticsMonitoringService : Service() {
         // Reset del accessibility para que el cartel naranja vuelva a aparecer
         // la próxima vez que el usuario entre a Envíos SC Pack.
         LogisticsAccessibilityService.resetMonitorState()
+        // HU-41 — empezar a reportar GPS (si hay permission; de lo contrario log y nada).
+        LocationReporter.start(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -55,6 +57,8 @@ class LogisticsMonitoringService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
+        // HU-41 — detener reporte GPS
+        LocationReporter.stop()
         onStateChange?.invoke()
         Log.i(TAG, "🔴 LogisticsMonitoringService destruido")
     }

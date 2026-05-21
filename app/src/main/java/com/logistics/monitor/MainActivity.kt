@@ -1,5 +1,6 @@
 package com.logistics.monitor
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -8,6 +9,7 @@ import android.util.Log
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -51,6 +53,26 @@ class MainActivity : AppCompatActivity() {
     private var foregroundPollJob: Job? = null
     private lateinit var realtimeClient: RealtimeStreamClient
     private lateinit var meRepository: MeRepository
+
+    // HU-41 — launcher para pedir permiso de ubicación.
+    // Si el user concede, arrancamos el LocationReporter; si no, sigue todo
+    // funcionando pero sin reporte GPS al back.
+    private val locationPermLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        val anyGranted = grants.values.any { it }
+        if (anyGranted) {
+            Toast.makeText(this, "📍 Ubicación habilitada — la flota te ve en el mapa", Toast.LENGTH_SHORT).show()
+            // Si el servicio ya está corriendo, arrancar el reporter ahora;
+            // si no, va a arrancar cuando se active el monitor.
+            if (LogisticsMonitoringService.isRunning) {
+                LocationReporter.start(this)
+            }
+        } else {
+            Toast.makeText(this, "⚠️ Sin permiso de ubicación, el supervisor no te verá en el mapa", Toast.LENGTH_LONG).show()
+        }
+        updateStatusDisplay()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -256,6 +278,15 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "⚠️ Primero activá el servicio de accesibilidad", Toast.LENGTH_LONG).show()
             return
         }
+        // HU-41 — si no hay permiso GPS, lo pedimos antes de arrancar.
+        // El servicio se inicia igual (el monitor funciona sin GPS), pero
+        // el reporter no postea hasta que haya permission.
+        if (!LocationReporter.hasPermission(this)) {
+            locationPermLauncher.launch(arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            ))
+        }
         val intent = Intent(this, LogisticsMonitoringService::class.java)
         startForegroundService(intent)
         updateStatusDisplay()
@@ -272,10 +303,12 @@ class MainActivity : AppCompatActivity() {
         val overlayOk = Settings.canDrawOverlays(this)
         val accessibilityOk = LogisticsAccessibilityService.isServiceConnected
         val serviceRunning = LogisticsMonitoringService.isRunning
+        val locationOk = LocationReporter.hasPermission(this)
 
         val statusLines = buildString {
             appendLine(if (overlayOk) "✅ Permiso overlay: OK" else "❌ Permiso overlay: FALTA")
             appendLine(if (accessibilityOk) "✅ Accesibilidad: ACTIVA" else "❌ Accesibilidad: INACTIVA")
+            appendLine(if (locationOk) "✅ Ubicación: OK" else "⚠️ Ubicación: NO concedida (sin GPS reporting)")
             appendLine(if (serviceRunning) "✅ Servicio: CORRIENDO" else "⏸️ Servicio: DETENIDO")
 
             if (overlayOk && accessibilityOk) {
