@@ -12,6 +12,9 @@ la app de logística **Envíos SC Pack** (`com.mercadoenvios.logistics`):
   supervisor. **Sin Google FCM**.
 - **Login con JWT** (HU-03): el repartidor inicia sesión y la app descarga su
   ruta del día + reglas activas, persiste en Room para uso offline.
+- **GPS reporting** (HU-41): la app envía la posición del dispositivo al back
+  cada 30s vía `FusedLocationProviderClient` (HIGH_ACCURACY, displacement 0),
+  alimentando el mapa de flota del supervisor en tiempo real.
 - **Modo global** (opcional): además de la app de envíos, reportar eventos
   de cualquier app del cel para análisis del supervisor.
 
@@ -45,6 +48,7 @@ app/src/main/java/com/logistics/monitor/
 ├── LogisticsMonitoringService.kt      ← ForegroundService + notif persistente
 ├── OverlayManager.kt                  ← Ventanas superpuestas
 ├── EventReporter.kt                   ← POST /api/events con Bearer
+├── LocationReporter.kt                ← HU-41: FusedLocation cada 30s → POST /api/positions
 ├── ScheduleApi.kt                     ← GET /api/schedule (polling)
 ├── ScheduleSyncWorker.kt              ← WorkManager periódico cada 15 min
 ├── ScheduleRepository.kt              ← snapshot local del horario
@@ -64,6 +68,7 @@ app/src/main/java/com/logistics/monitor/
 | Storage cifrado | androidx.security:security-crypto 1.1.0-alpha06 |
 | HTTP | OkHttp 4.12.0 (cliente único con AuthInterceptor + RefreshAuthenticator) |
 | Streaming | OkHttp SSE (`okhttp-sse`) para `/api/realtime/stream` |
+| GPS | `play-services-location` 21.3.0 (`FusedLocationProviderClient` — HU-41) |
 | JSON | Moshi 1.15.1 (kotlin-codegen) |
 | Background work | WorkManager 2.9.1 (sync cada 15 min) |
 | Coroutines | kotlinx.coroutines 1.7.3 |
@@ -86,14 +91,17 @@ app/src/main/java/com/logistics/monitor/
    - 📍 Ruta del día (nombre + fecha + nro de paradas)
    - 📋 Cantidad de reglas activas
    - Botones de configuración (overlay, accesibilidad, activar monitor)
-5. Activar monitor → ForegroundService + AccessibilityService
-6. Al abrir SC Pack → overlay amarillo con info de horario
-7. Al detectar escaneo en pantalla → cruza el ID con la parada activa,
+5. La app pide permiso de ubicación en `MainActivity.onResume` si todavía no fue concedido (HU-41)
+6. Activar monitor → ForegroundService + AccessibilityService + LocationReporter arranca
+7. Al abrir SC Pack → overlay amarillo con info de horario (debounce 5s para no duplicar app_opened/warning_shown)
+8. Al detectar escaneo en pantalla → cruza el ID con la parada activa,
    bloquea con overlay rojo si no coincide
-8. Cualquier cambio de horario desde el panel admin llega:
+9. Cualquier cambio de horario desde el panel admin llega:
    - **<1s** vía SSE si la app está en foreground
    - **<30s** vía polling si la app está abierta
    - **≤15 min** vía WorkManager si la app está en background
+10. GPS reporting: cada 30s la app reporta posición al back. En MainActivity se ve la línea
+    "📍 GPS: ✅ último fix hace Xs (POST ✅)" con auto-refresh cada 3s.
 
 ## Build CI (GitHub Actions)
 
@@ -115,9 +123,10 @@ desde **Actions → Artifacts → `logistics-monitor-debug-<sha>`**.
 1. Instalar APK (orígenes desconocidos habilitado para esta app)
 2. Abrir **Monitor Logística**
 3. Login con credenciales de repartidor
-4. **Paso 1**: Configurar permiso overlay (`SYSTEM_ALERT_WINDOW`)
-5. **Paso 2**: Activar servicio de accesibilidad — buscar "Monitor Logística"
-6. **Paso 3**: Activar monitor (botón amarillo)
+4. **Permiso de ubicación**: la app lo pide al primer onResume. Otorgar para que el supervisor te vea en el mapa de flota (HU-41).
+5. **Paso 1**: Configurar permiso overlay (`SYSTEM_ALERT_WINDOW`)
+6. **Paso 2**: Activar servicio de accesibilidad — buscar "Monitor Logística"
+7. **Paso 3**: Activar monitor (botón amarillo)
 
 > **Modo global**: opcional. Al activarlo, además de SC Pack, se reportan
 > eventos de cualquier app del celular al backend (gris en el panel admin).
