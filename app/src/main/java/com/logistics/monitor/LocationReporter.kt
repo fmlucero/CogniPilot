@@ -39,7 +39,9 @@ object LocationReporter {
     private const val PATH = "/api/positions"
     private const val INTERVAL_MS = 30_000L         // 30s entre lecturas
     private const val FASTEST_INTERVAL_MS = 15_000L // no más rápido que 15s
-    private const val MIN_DISPLACEMENT_M = 10f      // ignorar movimientos <10m
+    private const val MIN_DISPLACEMENT_M = 0f       // 0 = reportar SIEMPRE que llegue un fix, sin importar movimiento
+                                                    // (originalmente 10m, pero eso silenciaba la app cuando el
+                                                    // usuario estaba quieto — el interval de 30s ya regula)
 
     private const val CONNECT_TIMEOUT_MS = 5_000
     private const val READ_TIMEOUT_MS = 5_000
@@ -49,6 +51,12 @@ object LocationReporter {
     private var fusedClient: FusedLocationProviderClient? = null
     private var callback: LocationCallback? = null
     private var running = false
+
+    // Diagnóstico — para que MainActivity pueda mostrar feedback real al usuario.
+    @Volatile private var lastFixAt: Long = 0L         // ms desde epoch del último fix recibido
+    @Volatile private var lastPostStatus: Int = -1     // último HTTP status del POST (-1 si nunca)
+    fun lastFixAtMs(): Long = lastFixAt
+    fun lastPostStatusCode(): Int = lastPostStatus
 
     /** True si hay permission FINE o COARSE concedido. */
     fun hasPermission(context: Context): Boolean {
@@ -76,7 +84,12 @@ object LocationReporter {
         val client = LocationServices.getFusedLocationProviderClient(appCtx)
         fusedClient = client
 
-        val req = LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, INTERVAL_MS)
+        // HIGH_ACCURACY fuerza GPS hardware además de red — necesario para que
+        // se dispare el callback cuando el usuario no está movilizándose
+        // (Balanced en quietud puede no entregar nada). Más drain de batería
+        // pero aceptable para la jornada del repartidor (ya está la pantalla
+        // encendida con el monitor + foreground service).
+        val req = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, INTERVAL_MS)
             .setMinUpdateIntervalMillis(FASTEST_INTERVAL_MS)
             .setMinUpdateDistanceMeters(MIN_DISPLACEMENT_M)
             .setWaitForAccurateLocation(false)
@@ -85,6 +98,7 @@ object LocationReporter {
         val cb = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 val loc = result.lastLocation ?: return
+                lastFixAt = System.currentTimeMillis()
                 Log.i(TAG, "📍 GPS fix: lat=${loc.latitude}, lng=${loc.longitude}, accuracy=${loc.accuracy}m")
                 postPosition(appCtx, loc.latitude, loc.longitude, loc.time)
             }
@@ -100,6 +114,7 @@ object LocationReporter {
             // pin en el mapa enseguida sin esperar al primer fix completo.
             client.lastLocation.addOnSuccessListener { loc ->
                 if (loc != null) {
+                    lastFixAt = System.currentTimeMillis()
                     Log.i(TAG, "📍 last known fix: lat=${loc.latitude}, lng=${loc.longitude}, accuracy=${loc.accuracy}m")
                     postPosition(appCtx, loc.latitude, loc.longitude, loc.time)
                 } else {
@@ -162,6 +177,7 @@ object LocationReporter {
             }
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             val code = conn.responseCode
+            lastPostStatus = code
             if (code in 200..299) {
                 Log.i(TAG, "✅ POST /api/positions OK ($code)")
             } else {

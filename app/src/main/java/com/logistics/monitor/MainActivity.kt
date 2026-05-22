@@ -52,6 +52,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var globalModeRepository: GlobalModeRepository
 
     private var foregroundPollJob: Job? = null
+    private var statusRefreshJob: Job? = null
     private lateinit var realtimeClient: RealtimeStreamClient
     private lateinit var meRepository: MeRepository
 
@@ -143,6 +144,7 @@ class MainActivity : AppCompatActivity() {
         updateStatusDisplay()
         updateSessionDisplay()
         startForegroundPolling()
+        startStatusAutoRefresh()
         realtimeClient.connect()
         // HU-41 — pedir permiso GPS proactivamente al volver al foreground.
         // Una vez por sesión de la activity para no spamear al usuario.
@@ -165,7 +167,25 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         stopForegroundPolling()
+        stopStatusAutoRefresh()
         realtimeClient.disconnect()
+    }
+
+    /** Refresca el TextView de status cada 3s mientras la activity está visible
+     *  para que el contador "último fix hace Xs" se actualice en vivo. */
+    private fun startStatusAutoRefresh() {
+        statusRefreshJob?.cancel()
+        statusRefreshJob = lifecycleScope.launch {
+            while (isActive) {
+                delay(3_000L)
+                updateStatusDisplay()
+            }
+        }
+    }
+
+    private fun stopStatusAutoRefresh() {
+        statusRefreshJob?.cancel()
+        statusRefreshJob = null
     }
 
     override fun onDestroy() {
@@ -348,16 +368,29 @@ class MainActivity : AppCompatActivity() {
         val serviceRunning = LogisticsMonitoringService.isRunning
         val locationOk = LocationReporter.hasPermission(this)
         val locationReporting = LocationReporter.isRunning()
+        val lastFixAt = LocationReporter.lastFixAtMs()
+        val lastPostCode = LocationReporter.lastPostStatusCode()
 
         val statusLines = buildString {
             appendLine(if (overlayOk) "✅ Permiso overlay: OK" else "❌ Permiso overlay: FALTA")
             appendLine(if (accessibilityOk) "✅ Accesibilidad: ACTIVA" else "❌ Accesibilidad: INACTIVA")
-            appendLine(if (locationOk) "✅ Permiso ubicación: OK" else "⚠️ Permiso ubicación: NO (toca \"Configurar overlay\" después dame ubicación)")
-            appendLine(when {
-                locationReporting -> "📍 Reportando GPS: SÍ (cada 30s)"
-                locationOk -> "📍 Reportando GPS: ⏳ esperando primer fix..."
-                else -> "📍 Reportando GPS: NO (falta permiso)"
-            })
+            appendLine(if (locationOk) "✅ Permiso ubicación: OK" else "⚠️ Permiso ubicación: NO concedido")
+            // Línea de GPS — honesta: diferencia "esperando fix" vs "fix recibido"
+            val gpsLine = when {
+                !locationOk -> "📍 GPS: NO (falta permiso)"
+                !locationReporting -> "📍 GPS: ⏸️ reporter detenido"
+                lastFixAt == 0L -> "📍 GPS: ⏳ pidiendo updates — esperando primer fix (salí afuera si estás indoor)"
+                else -> {
+                    val sec = (System.currentTimeMillis() - lastFixAt) / 1000
+                    val httpInfo = when {
+                        lastPostCode == -1 -> ""
+                        lastPostCode in 200..299 -> " (POST ✅)"
+                        else -> " (⚠️ último POST HTTP $lastPostCode)"
+                    }
+                    "📍 GPS: ✅ último fix hace ${sec}s$httpInfo"
+                }
+            }
+            appendLine(gpsLine)
             appendLine(if (serviceRunning) "✅ Servicio: CORRIENDO" else "⏸️ Servicio: DETENIDO")
 
             if (overlayOk && accessibilityOk) {
