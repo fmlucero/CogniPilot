@@ -129,6 +129,8 @@ class MainActivity : AppCompatActivity() {
 
         // HU-18: schedule del worker periódico (background sync cada 15 min)
         ScheduleSyncWorker.schedulePeriodic(this)
+        // HU-10: drainer offline (15 min con constraint NetworkType.CONNECTED)
+        OfflineDrainWorker.schedulePeriodic(this)
         // HU-18 fase 4: cliente SSE para realtime (latencia <100ms en foreground)
         realtimeClient = RealtimeStreamClient(this)
 
@@ -162,6 +164,9 @@ class MainActivity : AppCompatActivity() {
         // HU-43 — reportar capabilities (overlay/acc/loc/notif/monitor). Es no-op
         // si nada cambió desde el último envío exitoso (>6h ago lo reenvía igual).
         CapabilitiesReporter.reportNow(this)
+        // HU-10 — trigger oneshot del drainer al volver al foreground. Si hay
+        // red, drena enseguida; si no hay, queda pendiente hasta que aparezca.
+        OfflineDrainWorker.triggerOneShot(this)
         // Refresh de ruta/reglas en background — best effort, sin bloquear UI
         lifecycleScope.launch {
             val sync = meRepository.syncFromBackend()
@@ -295,6 +300,7 @@ class MainActivity : AppCompatActivity() {
             realtimeClient.disconnect()
             stopForegroundPolling()
             ScheduleSyncWorker.cancel(applicationContext)
+            OfflineDrainWorker.cancel(applicationContext)
             AuthRepository.get(this@MainActivity).logout()
             val intent = Intent(this@MainActivity, SplashActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -389,6 +395,7 @@ class MainActivity : AppCompatActivity() {
         val lastFixAt = LocationReporter.lastFixAtMs()
         val lastPostCode = LocationReporter.lastPostStatusCode()
 
+        val pendingOffline = EventReporter.pendingCount(this)
         val statusLines = buildString {
             appendLine(if (overlayOk) "✅ Permiso overlay: OK" else "❌ Permiso overlay: FALTA")
             appendLine(if (accessibilityOk) "✅ Accesibilidad: ACTIVA" else "❌ Accesibilidad: INACTIVA")
@@ -410,6 +417,9 @@ class MainActivity : AppCompatActivity() {
             }
             appendLine(gpsLine)
             appendLine(if (serviceRunning) "✅ Servicio: CORRIENDO" else "⏸️ Servicio: DETENIDO")
+            if (pendingOffline > 0) {
+                appendLine("📥 Eventos offline pendientes: $pendingOffline (se envían al recuperar red)")
+            }
 
             if (overlayOk && accessibilityOk) {
                 appendLine("\n🟢 LISTO — Monitor funcionando")

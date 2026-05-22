@@ -4,8 +4,10 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.logistics.monitor.data.dao.EventoOfflineDao
 import com.logistics.monitor.data.dao.ReglaDao
 import com.logistics.monitor.data.dao.RutaDao
+import com.logistics.monitor.data.entities.EventoOfflineEntity
 import com.logistics.monitor.data.entities.ParadaEntity
 import com.logistics.monitor.data.entities.PaqueteEntity
 import com.logistics.monitor.data.entities.ReglaEntity
@@ -17,14 +19,16 @@ import com.logistics.monitor.data.entities.RutaEntity
         ParadaEntity::class,
         PaqueteEntity::class,
         ReglaEntity::class,
+        EventoOfflineEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun rutaDao(): RutaDao
     abstract fun reglaDao(): ReglaDao
+    abstract fun eventoOfflineDao(): EventoOfflineDao
 
     companion object {
         private const val DB_NAME = "cognipilot.db"

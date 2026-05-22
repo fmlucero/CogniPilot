@@ -3,6 +3,16 @@ package com.logistics.monitor
 import android.content.Context
 import android.util.Log
 import com.logistics.monitor.auth.AuthRepository
+import com.logistics.monitor.data.AppDatabase
+import com.logistics.monitor.data.entities.EventoOfflineEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -10,25 +20,23 @@ import java.net.URL
 import java.util.concurrent.Executors
 
 /**
- * Envía eventos del usuario al backend para mostrar en el panel web en tiempo
- * real (POST /api/events).
+ * Envía eventos del usuario al backend (POST /api/events) y, si la red falla
+ * (HU-10), los persiste en Room para drenarlos cuando vuelva la conexión.
  *
- * HU-03: ahora requiere Bearer token. Si no hay sesión, el evento se descarta
- * silenciosamente (logger.debug). El AAS sigue corriendo aunque no haya login;
- * el primer login después poblará los eventos correctos.
+ * HU-03: requiere Bearer token. Si no hay sesión, el evento se descarta (no
+ * persistimos eventos huérfanos sin user — los re-enviaríamos a la sesión
+ * equivocada después).
  *
- * - Fire-and-forget: si falla la red el evento se descarta.
- * - device_id se genera la primera vez y se guarda en SharedPreferences (mismo
- *   que usa DeviceIdProvider, compartido con AuthRepository).
- *
- * URL base configurada en res/values/strings.xml → @string/backend_base_url
+ * URL base configurada en res/values/strings.xml → @string/backend_base_url.
  */
 object EventReporter {
 
     private const val TAG = "EventReporter"
     private const val PATH = "/api/events"
+    private const val PATH_BULK = "/api/events/bulk"
     private const val CONNECT_TIMEOUT_MS = 4_000
     private const val READ_TIMEOUT_MS = 4_000
+    private const val DRAIN_BATCH = 200
 
     // Tipos válidos en el backend
     const val TYPE_APP_OPENED = "app_opened"
@@ -36,11 +44,12 @@ object EventReporter {
     const val TYPE_SCAN_DETECTED = "scan_detected"
     const val TYPE_USER_CONTINUED = "user_continued"
     const val TYPE_USER_CANCELLED = "user_cancelled"
-    // Modo global (apps externas a SC Pack)
     const val TYPE_GLOBAL_APP_OPENED = "global_app_opened"
     const val TYPE_GLOBAL_CLICKED = "global_clicked"
 
     private val executor = Executors.newSingleThreadExecutor()
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val drainMutex = Mutex()  // evita que dos drains corran a la vez
 
     fun report(
         context: Context,
@@ -70,15 +79,87 @@ object EventReporter {
             appPackage?.takeIf { it.isNotBlank() }?.let { put("appPackage", it) }
             screenText?.takeIf { it.isNotEmpty() }?.let { put("screenText", JSONArray(it)) }
         }.toString()
+        val ts = System.currentTimeMillis()
 
         executor.execute {
-            postJson("$baseUrl$PATH", payload, token)
+            val ok = postJson("$baseUrl$PATH", payload, token)
+            if (!ok) {
+                // HU-10 — sin red o back caído → persistir para drainer.
+                persistOffline(appCtx, type, payload, ts)
+            }
         }
     }
 
-    private fun postJson(url: String, body: String, token: String) {
+    /**
+     * HU-10 — drena los eventos pendientes en Room enviándolos en bulk al back.
+     * Llamado por OfflineDrainWorker (periódico + on-network-available) y por
+     * MainActivity al volver al foreground.
+     *
+     * Returns: (sent, failed) — útil para logs y tests.
+     */
+    suspend fun drainOffline(context: Context): Pair<Int, Int> {
+        val appCtx = context.applicationContext
+        val token = AuthRepository.get(appCtx).tokens.getAccessToken()
+        if (token.isNullOrBlank()) {
+            Log.d(TAG, "drainOffline: sin sesión — skip")
+            return 0 to 0
+        }
+
+        return drainMutex.withLock {
+            val dao = AppDatabase.get(appCtx).eventoOfflineDao()
+            val pending = dao.getPending(DRAIN_BATCH)
+            if (pending.isEmpty()) return@withLock 0 to 0
+
+            Log.i(TAG, "drainOffline: ${pending.size} eventos pendientes")
+            val baseUrl = appCtx.getString(R.string.backend_base_url).trimEnd('/')
+
+            // Armar el JSON bulk: { "events": [ ...payloads parseados... ] }
+            val events = JSONArray()
+            pending.forEach { e ->
+                try {
+                    events.put(JSONObject(e.payloadJson))
+                } catch (_: Exception) {
+                    Log.w(TAG, "evento ${e.id} con payload inválido — se descarta")
+                }
+            }
+            val body = JSONObject().put("events", events).toString()
+            val ok = postJson("$baseUrl$PATH_BULK", body, token)
+            if (ok) {
+                dao.deleteByIds(pending.map { it.id })
+                Log.i(TAG, "drainOffline: ${pending.size} enviados y borrados")
+                pending.size to 0
+            } else {
+                dao.bumpIntentos(pending.map { it.id })
+                Log.w(TAG, "drainOffline: falló — los eventos siguen en cola")
+                0 to pending.size
+            }
+        }
+    }
+
+    /** Cuántos eventos esperan offline — para diagnóstico en MainActivity. */
+    fun pendingCount(context: Context): Int = try {
+        runBlocking(Dispatchers.IO) {
+            AppDatabase.get(context.applicationContext).eventoOfflineDao().count()
+        }
+    } catch (_: Exception) { 0 }
+
+    private fun persistOffline(context: Context, type: String, payloadJson: String, ts: Long) {
+        ioScope.launch {
+            try {
+                AppDatabase.get(context).eventoOfflineDao().insert(
+                    EventoOfflineEntity(type = type, payloadJson = payloadJson, ts = ts)
+                )
+                Log.i(TAG, "💾 evento type=$type persistido offline (drainer lo procesa cuando vuelva la red)")
+            } catch (e: Exception) {
+                Log.w(TAG, "❌ persistOffline falló: ${e.message}")
+            }
+        }
+    }
+
+    /** Devuelve true si la red aceptó (HTTP 2xx). */
+    private fun postJson(url: String, body: String, token: String): Boolean {
         var conn: HttpURLConnection? = null
-        try {
+        return try {
             conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = CONNECT_TIMEOUT_MS
@@ -91,12 +172,20 @@ object EventReporter {
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             val code = conn.responseCode
             if (code in 200..299) {
-                Log.d(TAG, "✅ Evento enviado (HTTP $code) — $body")
+                Log.d(TAG, "✅ Evento(s) enviado(s) (HTTP $code)")
+                true
             } else {
-                Log.w(TAG, "⚠️ Backend respondió HTTP $code — $body")
+                Log.w(TAG, "⚠️ Backend respondió HTTP $code — body length=${body.length}")
+                // Tratar todo non-2xx como fallo: el caller persiste y el drainer
+                // reintenta. Un 4xx persistente acumularía basura, pero es preferible
+                // a perder un evento por un 5xx transitorio. El campo `intentos` del
+                // EventoOfflineEntity sirve para que un futuro purger limpie los
+                // crónicamente fallados.
+                false
             }
         } catch (e: Exception) {
-            Log.w(TAG, "❌ Falló envío de evento: ${e.message}")
+            Log.w(TAG, "❌ Falló envío de evento (red): ${e.message}")
+            false
         } finally {
             conn?.disconnect()
         }
