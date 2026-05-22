@@ -71,6 +71,8 @@ class MainActivity : AppCompatActivity() {
             if (LogisticsMonitoringService.isRunning) {
                 LocationReporter.start(this)
             }
+            // HU-43 — el flag location_perm cambió, reportar.
+            CapabilitiesReporter.reportNow(this)
         } else {
             // Si rationale es false, el usuario marcó "no preguntes de nuevo".
             // Lo redirigimos a configuración para que pueda otorgarlo manualmente.
@@ -157,6 +159,9 @@ class MainActivity : AppCompatActivity() {
         if (LocationReporter.hasPermission(this)) {
             LocationReporter.start(this)
         }
+        // HU-43 — reportar capabilities (overlay/acc/loc/notif/monitor). Es no-op
+        // si nada cambió desde el último envío exitoso (>6h ago lo reenvía igual).
+        CapabilitiesReporter.reportNow(this)
         // Refresh de ruta/reglas en background — best effort, sin bloquear UI
         lifecycleScope.launch {
             val sync = meRepository.syncFromBackend()
@@ -354,12 +359,16 @@ class MainActivity : AppCompatActivity() {
         startForegroundService(intent)
         updateStatusDisplay()
         Log.i(TAG, "Servicio foreground iniciado")
+        // HU-43 — el flag monitor_running acaba de cambiar; reportar.
+        CapabilitiesReporter.reportNow(this)
     }
 
     private fun stopMonitoringService() {
         stopService(Intent(this, LogisticsMonitoringService::class.java))
         updateStatusDisplay()
         Log.i(TAG, "Servicio foreground detenido")
+        // HU-43 — el flag monitor_running acaba de cambiar; reportar.
+        CapabilitiesReporter.reportNow(this)
     }
 
     private fun updateStatusDisplay() {
@@ -417,6 +426,8 @@ class MainActivity : AppCompatActivity() {
                 Toast.LENGTH_SHORT
             ).show()
             updateStatusDisplay()
+            // HU-43 — overlay cambió, reportar inmediato.
+            CapabilitiesReporter.reportNow(this)
         }
     }
 }
