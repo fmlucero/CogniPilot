@@ -51,6 +51,10 @@ class LogisticsAccessibilityService : AccessibilityService() {
             instance?.resetState()
         }
 
+        /** HU-09 — accessor para que el ParadaProximityWatcher dispare nudges
+         *  vía el OverlayManager del AAS. Null si el servicio no está activo. */
+        fun currentInstance(): LogisticsAccessibilityService? = instance
+
         /**
          * Llamado desde ScheduleMessagingService cuando llega un nuevo horario.
          * Fuerza una re-evaluación inmediata de los overlays si la app está en pantalla.
@@ -465,6 +469,17 @@ class LogisticsAccessibilityService : AccessibilityService() {
         warningShown = false
         blockingShown = false
         mainHandler.post { overlayManager.removeAllOverlays() }
+    }
+
+    /** HU-09 — invocado por ParadaProximityWatcher cuando el repartidor entra
+     *  a la geocerca de una parada. No interfiere con los overlays de horario
+     *  (warning/blocking) — usa la variante `showNudgeOverlay` que vive
+     *  arriba en la pantalla y se cierra solo. */
+    fun showNudgeFromWatcher(title: String, message: String) {
+        if (!::overlayManager.isInitialized) return
+        mainHandler.post {
+            overlayManager.showNudgeOverlay(title, message)
+        }
     }
 
     private fun reevaluateState() {

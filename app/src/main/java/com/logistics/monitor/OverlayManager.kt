@@ -30,6 +30,7 @@ class OverlayManager(private val context: Context) {
 
     private var warningView: View? = null
     private var blockingView: View? = null
+    private var nudgeView: View? = null
 
     // ─────────────────────────────────────────────────────────────────────────
     // Overlay 1: Advertencia (informativo)
@@ -109,16 +110,49 @@ class OverlayManager(private val context: Context) {
 
     // ─────────────────────────────────────────────────────────────────────────
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Overlay 3: Nudge (HU-09) — informativo no bloqueante, top, auto-dismiss
+    // ─────────────────────────────────────────────────────────────────────────
+
+    fun showNudgeOverlay(title: String, message: String, onTap: () -> Unit = {}) {
+        // Si ya hay un nudge visible, lo reemplazamos por el nuevo (caso poco
+        // probable — dos paradas en 8s).
+        removeNudgeOverlay()
+
+        val view = LayoutInflater.from(context).inflate(R.layout.overlay_nudge, null)
+        view.findViewById<TextView>(R.id.tvNudgeTitle).text = title
+        view.findViewById<TextView>(R.id.tvNudgeMessage).text = message
+        view.findViewById<View>(R.id.nudgeContainer).setOnClickListener {
+            removeNudgeOverlay()
+            onTap()
+        }
+
+        // Auto-cierre tras 8s — criterio de la HU.
+        view.postDelayed({ removeNudgeOverlay() }, 8_000)
+
+        addOverlay(view, gravity = Gravity.TOP)
+        nudgeView = view
+        Log.i(TAG, "📍 Nudge mostrado: $title")
+    }
+
+    private fun removeNudgeOverlay() {
+        nudgeView?.let {
+            try { windowManager.removeView(it) } catch (_: Exception) { /* ya removido */ }
+            nudgeView = null
+        }
+    }
+
     fun removeAllOverlays() {
         removeWarningOverlay()
         removeBlockingOverlay()
+        removeNudgeOverlay()
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Helper interno: agrega una view al WindowManager
     // ─────────────────────────────────────────────────────────────────────────
 
-    private fun addOverlay(view: View) {
+    private fun addOverlay(view: View, gravity: Int = Gravity.CENTER) {
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         } else {
@@ -134,7 +168,7 @@ class OverlayManager(private val context: Context) {
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.CENTER
+            this.gravity = gravity
         }
 
         try {

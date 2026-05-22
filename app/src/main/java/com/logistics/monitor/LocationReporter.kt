@@ -110,6 +110,8 @@ object LocationReporter {
                 lastLng = loc.longitude
                 Log.i(TAG, "📍 GPS fix: lat=${loc.latitude}, lng=${loc.longitude}, accuracy=${loc.accuracy}m")
                 postPosition(appCtx, loc.latitude, loc.longitude, loc.time)
+                // HU-09 — el watcher checkea si entramos a la geocerca de alguna parada.
+                ParadaProximityWatcher.evaluate(appCtx, loc.latitude, loc.longitude)
             }
         }
         callback = cb

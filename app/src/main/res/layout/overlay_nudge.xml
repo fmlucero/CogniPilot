@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HU-09 — Nudge no bloqueante: aparece al ingresar a la geocerca de una
+     parada. Tap en cualquier lado o auto-dismiss en 8s. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/nudgeContainer"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/cp_bg_elev_2"
+    android:padding="14dp"
+    android:elevation="18dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <TextView
+        android:id="@+id/tvNudgeTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📦 Parada cerca"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:fontFamily="@font/barlow_condensed_bold"
+        android:letterSpacing="0.03"
+        android:textColor="@color/cp_text"
+        android:paddingBottom="4dp" />
+
+    <TextView
+        android:id="@+id/tvNudgeMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="@color/cp_text_muted"
+        android:lineSpacingExtra="2dp" />
+
+    <TextView
+        android:id="@+id/tvNudgeHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Tocá para cerrar"
+        android:textSize="10sp"
+        android:textColor="@color/cp_text_faint"
+        android:gravity="end"
+        android:paddingTop="4dp" />
+
+</LinearLayout>

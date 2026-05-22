@@ -61,9 +61,12 @@ class MeRepository(private val context: Context) {
                     }
                 }
                 db.rutaDao().replaceRutaCompleta(rutaEnt, paradaEnts, paqueteEnts)
+                // HU-09 — poblar cache del watcher de proximidad con las nuevas paradas.
+                com.logistics.monitor.ParadaProximityWatcher.updateCache(paradaEnts, paqueteEnts)
             } else {
                 // Sin asignación → limpiar local
                 db.rutaDao().deleteAllRutas()
+                com.logistics.monitor.ParadaProximityWatcher.reset()
             }
             rutaOk = true
         } catch (e: Exception) {
