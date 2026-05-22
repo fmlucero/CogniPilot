@@ -225,6 +225,15 @@ class MainActivity : AppCompatActivity() {
         if (changed) {
             Log.i(TAG, "📡 Polling detectó cambio de schedule")
         }
+        // HU-04 — bajar el TTL de sync de reglas (y ruta) a <=30s en foreground.
+        // El criterio de la HU es "los dispositivos reciben la regla en la próxima
+        // sincronización (máx 30 seg con conexión)" — esto lo cubre. En background
+        // sigue corriendo el ScheduleSyncWorker cada 15 min.
+        val syncResult = meRepository.syncFromBackend()
+        if (syncResult.reglasOk || syncResult.rutaOk) {
+            // Solo repintamos si UI ya esta visible.
+            runOnUiThread { updateSessionDisplay() }
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
