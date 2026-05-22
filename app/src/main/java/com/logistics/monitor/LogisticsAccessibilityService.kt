@@ -370,6 +370,34 @@ class LogisticsAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * HU-42 — evaluar reglas geofence activas. Si el repartidor está fuera
+     * del radio permitido, el overlay muestra distancia + radio. Si la
+     * accion es "bloquear" y está fuera, el mensaje resalta que NO debe
+     * continuar (la decisión final sigue siendo del repartidor: HU-08
+     * dejó el flujo "Continuar igual / Cancelar" como UX no-coercitiva).
+     */
+    private fun buildScanOverlayContent(contextStr: String): Pair<String, String> {
+        val geo = GeofenceEvaluator.evaluateForScan()
+        return when (geo) {
+            is GeofenceEvaluator.Result.Outside -> {
+                val verbo = if (geo.accion == "bloquear") "🚫 ESCANEO FUERA DE ZONA"
+                            else "⚠️ ESCANEO FUERA DE ZONA"
+                val nota = if (geo.accion == "bloquear")
+                    "\n\n🚷 Regla \"${geo.ruleName}\" exige escanear DENTRO del radio."
+                else
+                    "\n\n📍 Regla \"${geo.ruleName}\": estás escaneando fuera del radio recomendado."
+                verbo to "Se detectaron elementos de escaneo:\n$contextStr\n\n📡 Estás a ${"%.0f".format(geo.distanceM)}m del centro (radio: ${"%.0f".format(geo.radiusM)}m).$nota"
+            }
+            is GeofenceEvaluator.Result.Inside -> {
+                "🚫 ESCANEO QR DETECTADO" to "Se detectaron elementos de escaneo:\n$contextStr\n\n✅ Estás dentro de la zona permitida por la regla \"${geo.ruleName}\".\nVerificá el horario antes de continuar."
+            }
+            else -> {
+                "🚫 ESCANEO QR DETECTADO" to "Se detectaron elementos de escaneo:\n$contextStr\n\n⚠️ Verificá que el horario sea el correcto antes de escanear."
+            }
+        }
+    }
+
     private fun onQRScanDetected(allTexts: List<String>, detectedKeywords: List<String>) {
         if (blockingShown) return
         blockingShown = true
@@ -389,10 +417,12 @@ class LogisticsAccessibilityService : AccessibilityService() {
             inSchedule = inSchedule,
         )
 
+        val (title, message) = buildScanOverlayContent(contextStr)
+
         mainHandler.post {
             overlayManager.showBlockingOverlay(
-                title = "🚫 ESCANEO QR DETECTADO",
-                message = "Se detectaron elementos de escaneo:\n$contextStr\n\n⚠️ Verificá que el horario sea el correcto antes de escanear.",
+                title = title,
+                message = message,
                 onContinue = {
                     Log.w(TAG, "⚠️ Usuario eligió CONTINUAR con el escaneo")
                     blockingShown = false

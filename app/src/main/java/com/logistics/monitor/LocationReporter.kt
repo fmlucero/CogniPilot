@@ -55,8 +55,15 @@ object LocationReporter {
     // Diagnóstico — para que MainActivity pueda mostrar feedback real al usuario.
     @Volatile private var lastFixAt: Long = 0L         // ms desde epoch del último fix recibido
     @Volatile private var lastPostStatus: Int = -1     // último HTTP status del POST (-1 si nunca)
+    @Volatile private var lastLat: Double? = null
+    @Volatile private var lastLng: Double? = null
     fun lastFixAtMs(): Long = lastFixAt
     fun lastPostStatusCode(): Int = lastPostStatus
+    /** HU-42 — pareja lat/lng más reciente recibida del callback, o null si todavía no llegó ningún fix. */
+    fun lastLatLng(): Pair<Double, Double>? {
+        val la = lastLat; val ln = lastLng
+        return if (la != null && ln != null) la to ln else null
+    }
 
     /** True si hay permission FINE o COARSE concedido. */
     fun hasPermission(context: Context): Boolean {
@@ -99,6 +106,8 @@ object LocationReporter {
             override fun onLocationResult(result: LocationResult) {
                 val loc = result.lastLocation ?: return
                 lastFixAt = System.currentTimeMillis()
+                lastLat = loc.latitude
+                lastLng = loc.longitude
                 Log.i(TAG, "📍 GPS fix: lat=${loc.latitude}, lng=${loc.longitude}, accuracy=${loc.accuracy}m")
                 postPosition(appCtx, loc.latitude, loc.longitude, loc.time)
             }
@@ -115,6 +124,8 @@ object LocationReporter {
             client.lastLocation.addOnSuccessListener { loc ->
                 if (loc != null) {
                     lastFixAt = System.currentTimeMillis()
+                    lastLat = loc.latitude
+                    lastLng = loc.longitude
                     Log.i(TAG, "📍 last known fix: lat=${loc.latitude}, lng=${loc.longitude}, accuracy=${loc.accuracy}m")
                     postPosition(appCtx, loc.latitude, loc.longitude, loc.time)
                 } else {
