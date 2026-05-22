@@ -147,6 +147,14 @@ class MainActivity : AppCompatActivity() {
         // HU-41 — pedir permiso GPS proactivamente al volver al foreground.
         // Una vez por sesión de la activity para no spamear al usuario.
         askLocationPermissionIfNeeded()
+        // HU-41 — si ya hay permiso, arrancar el reporter aunque el monitor
+        // foreground service NO esté activo. start() es idempotente. Mientras
+        // la activity esté visible Android mantiene el proceso vivo y los
+        // updates llegan. Para reporting en background sin activity, el user
+        // tiene que activar el monitor (foregroundServiceType=location).
+        if (LocationReporter.hasPermission(this)) {
+            LocationReporter.start(this)
+        }
         // Refresh de ruta/reglas en background — best effort, sin bloquear UI
         lifecycleScope.launch {
             val sync = meRepository.syncFromBackend()
@@ -339,11 +347,17 @@ class MainActivity : AppCompatActivity() {
         val accessibilityOk = LogisticsAccessibilityService.isServiceConnected
         val serviceRunning = LogisticsMonitoringService.isRunning
         val locationOk = LocationReporter.hasPermission(this)
+        val locationReporting = LocationReporter.isRunning()
 
         val statusLines = buildString {
             appendLine(if (overlayOk) "✅ Permiso overlay: OK" else "❌ Permiso overlay: FALTA")
             appendLine(if (accessibilityOk) "✅ Accesibilidad: ACTIVA" else "❌ Accesibilidad: INACTIVA")
-            appendLine(if (locationOk) "✅ Ubicación: OK" else "⚠️ Ubicación: NO concedida (sin GPS reporting)")
+            appendLine(if (locationOk) "✅ Permiso ubicación: OK" else "⚠️ Permiso ubicación: NO (toca \"Configurar overlay\" después dame ubicación)")
+            appendLine(when {
+                locationReporting -> "📍 Reportando GPS: SÍ (cada 30s)"
+                locationOk -> "📍 Reportando GPS: ⏳ esperando primer fix..."
+                else -> "📍 Reportando GPS: NO (falta permiso)"
+            })
             appendLine(if (serviceRunning) "✅ Servicio: CORRIENDO" else "⏸️ Servicio: DETENIDO")
 
             if (overlayOk && accessibilityOk) {

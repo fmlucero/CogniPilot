@@ -57,6 +57,9 @@ object LocationReporter {
         return fine == PackageManager.PERMISSION_GRANTED || coarse == PackageManager.PERMISSION_GRANTED
     }
 
+    /** True si el reporter está pidiendo updates activamente. */
+    fun isRunning(): Boolean = running
+
     /** Empieza a pedir updates de ubicación. Idempotente. */
     @SuppressLint("MissingPermission") // chequeamos arriba con hasPermission()
     fun start(context: Context) {
@@ -82,6 +85,7 @@ object LocationReporter {
         val cb = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 val loc = result.lastLocation ?: return
+                Log.i(TAG, "📍 GPS fix: lat=${loc.latitude}, lng=${loc.longitude}, accuracy=${loc.accuracy}m")
                 postPosition(appCtx, loc.latitude, loc.longitude, loc.time)
             }
         }
@@ -91,6 +95,17 @@ object LocationReporter {
             client.requestLocationUpdates(req, cb, Looper.getMainLooper())
             running = true
             Log.i(TAG, "▶️ LocationReporter iniciado — interval=${INTERVAL_MS}ms, displacement=${MIN_DISPLACEMENT_M}m")
+            // Disparar un primer POST inmediato con la última posición conocida
+            // (cache del sistema), si hay. Útil para que el supervisor vea el
+            // pin en el mapa enseguida sin esperar al primer fix completo.
+            client.lastLocation.addOnSuccessListener { loc ->
+                if (loc != null) {
+                    Log.i(TAG, "📍 last known fix: lat=${loc.latitude}, lng=${loc.longitude}, accuracy=${loc.accuracy}m")
+                    postPosition(appCtx, loc.latitude, loc.longitude, loc.time)
+                } else {
+                    Log.i(TAG, "ℹ️ sin lastLocation cacheada — esperando primer fix del callback")
+                }
+            }
         } catch (e: SecurityException) {
             Log.w(TAG, "❌ SecurityException al pedir updates: ${e.message}")
             running = false
@@ -148,9 +163,10 @@ object LocationReporter {
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             val code = conn.responseCode
             if (code in 200..299) {
-                Log.d(TAG, "📍 posición OK ($code)")
+                Log.i(TAG, "✅ POST /api/positions OK ($code)")
             } else {
-                Log.w(TAG, "⚠️ back respondió HTTP $code para position update")
+                val errBody = try { conn.errorStream?.bufferedReader()?.readText().orEmpty() } catch (_: Exception) { "" }
+                Log.w(TAG, "⚠️ back respondió HTTP $code para position update: ${errBody.take(200)}")
             }
         } catch (e: Exception) {
             Log.w(TAG, "❌ falló envío de posición: ${e.message}")
