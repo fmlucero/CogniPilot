@@ -88,6 +88,9 @@ class MeRepository(private val context: Context) {
             // HU-42 — poblar cache de geofence usado por el AAS al detectar
             // un escaneo. Mismo input que /api/me/reglas pero filtrado al tipo.
             com.logistics.monitor.GeofenceCache.update(reglaEnts.filter { it.activa })
+            // HU-54 — poblar cache de reglas de acceso operativo (modo app_trabajo)
+            // que el AAS evalúa de forma continua para cerrar la app de trabajo.
+            com.logistics.monitor.AccesoOperativoEnforcer.update(reglaEnts.filter { it.activa })
             reglasOk = true
         } catch (e: Exception) {
             Log.w(TAG, "❌ Sync reglas falló: ${e.message}")

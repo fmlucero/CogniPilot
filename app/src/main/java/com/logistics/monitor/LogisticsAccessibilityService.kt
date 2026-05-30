@@ -94,6 +94,27 @@ class LogisticsAccessibilityService : AccessibilityService() {
     private var lastTargetOpenedAt: Long = 0L
     private val TARGET_OPENED_DEBOUNCE_MS = 5_000L
 
+    // HU-54 — enforcement continuo de reglas acceso_operativo (modo app_trabajo).
+    // Un ticker re-evalúa cada ENFORCE_INTERVAL mientras la app de trabajo está
+    // en primer plano (cubre que el repartidor salga de la zona o cruce el
+    // horario sin reabrir la app). El overlay/reporte se debouncen para no
+    // spamear, pero el envío a Home se hace en cada detección.
+    private val ENFORCE_INTERVAL_MS = 15_000L
+    private val ACCESO_BLOCK_DEBOUNCE_MS = 8_000L
+    private var lastAccesoBlockAt: Long = 0L
+    private val enforceRunnable = object : Runnable {
+        override fun run() {
+            try {
+                val active = rootInActiveWindow?.packageName?.toString()
+                if (active == TARGET_PACKAGE) enforceAccesoOperativo()
+            } catch (e: Exception) {
+                Log.w(TAG, "ticker acceso_operativo: ${e.message}")
+            } finally {
+                mainHandler.postDelayed(this, ENFORCE_INTERVAL_MS)
+            }
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Ciclo de vida
     // ─────────────────────────────────────────────────────────────────────────
@@ -127,6 +148,9 @@ class LogisticsAccessibilityService : AccessibilityService() {
         }
         serviceInfo = info
         Log.i(TAG, "📡 packageNames=null (filtro en código). Modo global: ${globalModeRepository.isEnabled()}")
+
+        // HU-54 — arrancar el ticker de enforcement de acceso operativo.
+        mainHandler.postDelayed(enforceRunnable, ENFORCE_INTERVAL_MS)
     }
 
     /**
@@ -145,6 +169,7 @@ class LogisticsAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        mainHandler.removeCallbacks(enforceRunnable)
         if (::overlayManager.isInitialized) overlayManager.removeAllOverlays()
         isServiceConnected = false
         instance = null
@@ -184,6 +209,15 @@ class LogisticsAccessibilityService : AccessibilityService() {
         }
 
         // ── Desde acá: pkg == TARGET_PACKAGE ──
+
+        // HU-54 — el enforcement de acceso_operativo (modo app_trabajo) tiene
+        // prioridad: si la regla de acceso falla (fuera de geocerca/horario),
+        // echamos al repartidor a Home + overlay y cortamos acá, sin entrar al
+        // flujo legacy de horario/escaneo.
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            if (enforceAccesoOperativo()) return
+        }
+
         val snapshot = scheduleRepository.load()
 
         // Lógica de Prioridad:
@@ -469,6 +503,50 @@ class LogisticsAccessibilityService : AccessibilityService() {
         warningShown = false
         blockingShown = false
         mainHandler.post { overlayManager.removeAllOverlays() }
+    }
+
+    /**
+     * HU-54 — Enforcement estándar de las reglas `acceso_operativo` (modo
+     * `app_trabajo`). Si el repartidor está fuera de la geocerca u horario
+     * permitido, lo mandamos a Home (cierra la app de trabajo) y mostramos un
+     * overlay explicando por qué. Devuelve true si tomó la acción de bloqueo.
+     *
+     * El envío a Home se hace en cada detección (para que no pueda quedarse en
+     * la app); el overlay + el reporte de evento se debouncen para no spamear.
+     */
+    private fun enforceAccesoOperativo(): Boolean {
+        val result = AccesoOperativoEnforcer.evaluate()
+        if (result !is AccesoOperativoEnforcer.Result.Denied) return false
+
+        Log.w(TAG, "🔒 ACCESO DENEGADO — regla='${result.ruleName}' (${result.reason}) → Home")
+
+        // Limpiar los flags del flujo legacy SIN borrar overlays (el overlay de
+        // acceso debe quedar visible sobre Home; resetState() los removería).
+        targetAppActive = false
+        warningShown = false
+        blockingShown = false
+
+        // Cerrar la app de trabajo mandando al launcher.
+        performGlobalAction(GLOBAL_ACTION_HOME)
+
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastAccesoBlockAt > ACCESO_BLOCK_DEBOUNCE_MS) {
+            lastAccesoBlockAt = now
+            EventReporter.report(
+                this,
+                EventReporter.TYPE_WARNING_SHOWN,
+                screenName = "Acceso bloqueado: ${result.reason}",
+                inSchedule = false,
+            )
+            mainHandler.post {
+                overlayManager.showWarningOverlay(
+                    title = "🔒 Acceso no permitido",
+                    message = "No podés usar la app de trabajo en este momento.\n\n${result.reason}.\n\nRegla: \"${result.ruleName}\".",
+                    onDismiss = { Log.i(TAG, "Overlay de acceso cerrado") },
+                )
+            }
+        }
+        return true
     }
 
     /** HU-09 — invocado por ParadaProximityWatcher cuando el repartidor entra
