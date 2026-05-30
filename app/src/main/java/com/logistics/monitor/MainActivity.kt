@@ -9,6 +9,8 @@ import android.util.Log
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.ViewFlipper
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -50,6 +52,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnOpenAccessibility: Button
     private lateinit var btnToggleGlobal: Button
     private lateinit var globalModeRepository: GlobalModeRepository
+
+    // HU-55 — navegación por pestañas. El ViewFlipper alterna las 4 secciones
+    // (Inicio/Mi Ruta/Permisos/Perfil) sin fragments: la lógica sigue viviendo
+    // en esta Activity, sólo cambia qué sección está visible.
+    private lateinit var viewFlipper: ViewFlipper
+    private lateinit var bottomNav: BottomNavigationView
+    private lateinit var tvSectionTitle: TextView
 
     private var foregroundPollJob: Job? = null
     private var statusRefreshJob: Job? = null
@@ -120,9 +129,13 @@ class MainActivity : AppCompatActivity() {
         btnConfigureOverlay = findViewById(R.id.btnConfigureOverlay)
         btnOpenAccessibility = findViewById(R.id.btnOpenAccessibility)
         btnToggleGlobal = findViewById(R.id.btnToggleGlobal)
+        viewFlipper = findViewById(R.id.viewFlipper)
+        bottomNav = findViewById(R.id.bottomNav)
+        tvSectionTitle = findViewById(R.id.tvSectionTitle)
         globalModeRepository = GlobalModeRepository(this)
         meRepository = MeRepository(this)
 
+        setupTabs()
         setupButtons()
         updateGlobalButtonLabel()
         updateSessionDisplay()
@@ -242,6 +255,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * HU-55 — conecta la BottomNavigationView con el ViewFlipper.
+     * Cada tab muestra la sección correspondiente (mismo índice) y actualiza
+     * el subtítulo del header. No mueve la lógica: los controles de cada
+     * sección siguen siendo los mismos views con sus listeners de setupButtons().
+     */
+    private fun setupTabs() {
+        bottomNav.setOnItemSelectedListener { item ->
+            val (idx, titleRes) = when (item.itemId) {
+                R.id.tab_inicio -> 0 to R.string.tab_inicio
+                R.id.tab_ruta -> 1 to R.string.tab_ruta
+                R.id.tab_permisos -> 2 to R.string.tab_permisos
+                R.id.tab_perfil -> 3 to R.string.tab_perfil
+                else -> 0 to R.string.tab_inicio
+            }
+            viewFlipper.displayedChild = idx
+            tvSectionTitle.setText(titleRes)
+            true
+        }
+        // Arranca en Inicio.
+        bottomNav.selectedItemId = R.id.tab_inicio
+    }
 
     private fun setupButtons() {
         btnConfigureOverlay.setOnClickListener {

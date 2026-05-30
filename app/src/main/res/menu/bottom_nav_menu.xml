@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HU-55 — Tabs de navegación inferior de la app del repartidor. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/tab_inicio"
+        android:icon="@drawable/ic_tab_inicio"
+        android:title="@string/tab_inicio" />
+    <item
+        android:id="@+id/tab_ruta"
+        android:icon="@drawable/ic_tab_ruta"
+        android:title="@string/tab_ruta" />
+    <item
+        android:id="@+id/tab_permisos"
+        android:icon="@drawable/ic_tab_permisos"
+        android:title="@string/tab_permisos" />
+    <item
+        android:id="@+id/tab_perfil"
+        android:icon="@drawable/ic_tab_perfil"
+        android:title="@string/tab_perfil" />
+</menu>

@@ -14,4 +14,10 @@
     <string name="login_error_invalid">Credenciales incorrectas</string>
     <string name="login_error_empty">Completá email y contraseña</string>
     <string name="login_error_network">Sin conexión al servidor — reintentá</string>
+
+    <!-- HU-55 — tabs de navegación inferior -->
+    <string name="tab_inicio">Inicio</string>
+    <string name="tab_ruta">Mi Ruta</string>
+    <string name="tab_permisos">Permisos</string>
+    <string name="tab_perfil">Perfil</string>
 </resources>
