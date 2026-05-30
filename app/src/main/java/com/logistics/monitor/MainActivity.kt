@@ -3,10 +3,13 @@ package com.logistics.monitor
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
+import android.view.View
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ViewFlipper
@@ -14,6 +17,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.logistics.monitor.auth.AuthRepository
@@ -59,6 +63,22 @@ class MainActivity : AppCompatActivity() {
     private lateinit var viewFlipper: ViewFlipper
     private lateinit var bottomNav: BottomNavigationView
     private lateinit var tvSectionTitle: TextView
+
+    // HU-56 — sección "Mi Ruta"
+    private lateinit var tvRutaTitulo: TextView
+    private lateinit var tvRutaResumen: TextView
+    private lateinit var rutaContainer: LinearLayout
+    private lateinit var rutaVacia: View
+
+    // HU-58 — sección "Permisos" (estado visual por permiso)
+    private lateinit var tvPermResumen: TextView
+    private lateinit var tvPermOverlayState: TextView
+    private lateinit var tvPermAccState: TextView
+    private lateinit var tvPermLocState: TextView
+    private lateinit var tvPermNotifState: TextView
+    private lateinit var tvPermMonitorState: TextView
+    private lateinit var btnPermLocation: Button
+    private lateinit var btnPermNotif: Button
 
     private var foregroundPollJob: Job? = null
     private var statusRefreshJob: Job? = null
@@ -132,6 +152,20 @@ class MainActivity : AppCompatActivity() {
         viewFlipper = findViewById(R.id.viewFlipper)
         bottomNav = findViewById(R.id.bottomNav)
         tvSectionTitle = findViewById(R.id.tvSectionTitle)
+        // HU-56
+        tvRutaTitulo = findViewById(R.id.tvRutaTitulo)
+        tvRutaResumen = findViewById(R.id.tvRutaResumen)
+        rutaContainer = findViewById(R.id.rutaContainer)
+        rutaVacia = findViewById(R.id.rutaVacia)
+        // HU-58
+        tvPermResumen = findViewById(R.id.tvPermResumen)
+        tvPermOverlayState = findViewById(R.id.tvPermOverlayState)
+        tvPermAccState = findViewById(R.id.tvPermAccState)
+        tvPermLocState = findViewById(R.id.tvPermLocState)
+        tvPermNotifState = findViewById(R.id.tvPermNotifState)
+        tvPermMonitorState = findViewById(R.id.tvPermMonitorState)
+        btnPermLocation = findViewById(R.id.btnPermLocation)
+        btnPermNotif = findViewById(R.id.btnPermNotif)
         globalModeRepository = GlobalModeRepository(this)
         meRepository = MeRepository(this)
 
@@ -160,6 +194,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         updateStatusDisplay()
         updateSessionDisplay()
+        renderMiRuta()
         startForegroundPolling()
         startStatusAutoRefresh()
         realtimeClient.connect()
@@ -184,6 +219,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val sync = meRepository.syncFromBackend()
             if (sync.rutaOk || sync.reglasOk) updateSessionDisplay()
+            if (sync.rutaOk) renderMiRuta()
         }
     }
 
@@ -323,6 +359,126 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnLogout.setOnClickListener { onLogoutPressed() }
+
+        // HU-58 — botones de la sección Permisos
+        btnPermLocation.setOnClickListener {
+            if (LocationReporter.hasPermission(this)) {
+                Toast.makeText(this, "✅ Permiso de ubicación ya concedido", Toast.LENGTH_SHORT).show()
+            } else {
+                locationPermLauncher.launch(arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ))
+            }
+        }
+        btnPermNotif.setOnClickListener {
+            if (NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+                Toast.makeText(this, "✅ Notificaciones ya habilitadas", Toast.LENGTH_SHORT).show()
+            } else {
+                openNotificationSettings()
+            }
+        }
+    }
+
+    /** HU-58 — abre los ajustes de notificación de la app (API 26+) o, en
+     *  versiones anteriores, la pantalla de detalles de la app. */
+    private fun openNotificationSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            startActivity(intent)
+        } else {
+            openAppSettings()
+        }
+    }
+
+    /**
+     * HU-56 — Pinta la ruta del día (cacheada en Room) como lista de paradas.
+     * Lee de Room en una coroutine; si no hay ruta o no tiene paradas, muestra
+     * el estado vacío.
+     */
+    private fun renderMiRuta() {
+        lifecycleScope.launch {
+            val ruta = meRepository.getRutaCached()
+            if (ruta == null) {
+                tvRutaTitulo.text = "Mi ruta del día"
+                tvRutaResumen.text = "—"
+                rutaContainer.removeAllViews()
+                rutaVacia.visibility = View.VISIBLE
+                return@launch
+            }
+            val paradas = meRepository.getParadasCached(ruta.id)
+            val paquetes = meRepository.getPaquetesCached(paradas.map { it.id })
+            val paquetesPorParada = paquetes.groupBy { it.paradaId }
+
+            tvRutaTitulo.text = ruta.nombre
+            tvRutaResumen.text = "${ruta.fecha} · ${paradas.size} paradas · ${paquetes.size} paquetes"
+            rutaVacia.visibility = if (paradas.isEmpty()) View.VISIBLE else View.GONE
+
+            rutaContainer.removeAllViews()
+            for (p in paradas) {
+                val card = layoutInflater.inflate(R.layout.item_parada, rutaContainer, false)
+                card.findViewById<TextView>(R.id.tvParadaOrden).text = p.orden.toString()
+                card.findViewById<TextView>(R.id.tvParadaDireccion).text =
+                    p.direccion?.takeIf { it.isNotBlank() } ?: "Parada ${p.orden}"
+                val ventana = when {
+                    p.ventanaDesde != null && p.ventanaHasta != null -> "🕒 ${p.ventanaDesde} – ${p.ventanaHasta}"
+                    p.ventanaDesde != null -> "🕒 desde ${p.ventanaDesde}"
+                    p.ventanaHasta != null -> "🕒 hasta ${p.ventanaHasta}"
+                    else -> "Sin ventana horaria"
+                }
+                card.findViewById<TextView>(R.id.tvParadaVentana).text = ventana
+                val pqs = paquetesPorParada[p.id].orEmpty()
+                val pqText = if (pqs.isEmpty()) {
+                    "Sin paquetes"
+                } else {
+                    "📦 ${pqs.size} paquete(s):\n" + pqs.joinToString("\n") { pq ->
+                        "• ${pq.codigoMl}" + (pq.descripcion?.let { " — $it" } ?: "")
+                    }
+                }
+                card.findViewById<TextView>(R.id.tvParadaPaquetes).text = pqText
+                rutaContainer.addView(card)
+            }
+        }
+    }
+
+    /**
+     * HU-58 — Actualiza el estado visual de cada permiso (✓/✗ + color) y el
+     * resumen. Oculta el botón de acción del permiso ya concedido. Es síncrono
+     * y barato; se llama desde onResume y desde updateStatusDisplay (auto-refresh).
+     */
+    private fun updatePermisosDisplay() {
+        val overlayOk = Settings.canDrawOverlays(this)
+        val accOk = LogisticsAccessibilityService.isServiceConnected
+        val locOk = LocationReporter.hasPermission(this)
+        val notifOk = NotificationManagerCompat.from(this).areNotificationsEnabled()
+        val monitorOk = LogisticsMonitoringService.isRunning
+
+        setPermState(tvPermOverlayState, overlayOk)
+        setPermState(tvPermAccState, accOk)
+        setPermState(tvPermLocState, locOk)
+        setPermState(tvPermNotifState, notifOk)
+        setPermState(tvPermMonitorState, monitorOk)
+
+        btnConfigureOverlay.visibility = if (overlayOk) View.GONE else View.VISIBLE
+        btnOpenAccessibility.visibility = if (accOk) View.GONE else View.VISIBLE
+        btnPermLocation.visibility = if (locOk) View.GONE else View.VISIBLE
+        btnPermNotif.visibility = if (notifOk) View.GONE else View.VISIBLE
+
+        // El monitor no es un permiso: cuentan los 4 permisos/servicios requeridos.
+        val faltan = listOf(overlayOk, accOk, locOk, notifOk).count { !it }
+        if (faltan == 0) {
+            tvPermResumen.text = "✅ Todo listo para trabajar"
+            tvPermResumen.setTextColor(ContextCompat.getColor(this, R.color.cp_success))
+        } else {
+            tvPermResumen.text = "⚠️ Faltan $faltan permiso(s) por configurar"
+            tvPermResumen.setTextColor(ContextCompat.getColor(this, R.color.cp_warning))
+        }
+    }
+
+    private fun setPermState(tv: TextView, ok: Boolean) {
+        tv.text = if (ok) "✓" else "✗"
+        tv.setTextColor(ContextCompat.getColor(this, if (ok) R.color.cp_success else R.color.cp_error))
     }
 
     /**
@@ -469,6 +625,9 @@ class MainActivity : AppCompatActivity() {
         tvStatus.text = statusLines
         btnToggleMonitor.text = if (serviceRunning) "⏹ Desactivar monitor" else "▶️ Activar monitor"
         btnToggleMonitor.isEnabled = overlayOk && accessibilityOk
+
+        // HU-58 — refrescar los estados visuales de la sección Permisos.
+        updatePermisosDisplay()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

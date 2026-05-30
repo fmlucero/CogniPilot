@@ -98,6 +98,8 @@ class MeRepository(private val context: Context) {
 
     suspend fun getRutaCached(): RutaEntity? = db.rutaDao().getLastRuta()
     suspend fun getParadasCached(rutaId: String) = db.rutaDao().getParadas(rutaId)
+    // HU-56 — paquetes de un conjunto de paradas (para la pantalla "Mi Ruta").
+    suspend fun getPaquetesCached(paradaIds: List<String>) = db.rutaDao().getPaquetes(paradaIds)
     suspend fun getReglasCachedActivas() = db.reglaDao().getActivas()
 
     companion object {

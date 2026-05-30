@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HU-56 — Card de una parada de la ruta del día. Se infla N veces dentro del
+     contenedor de la sección "Mi Ruta". -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/cp_bg_elev"
+    android:padding="14dp"
+    android:layout_marginBottom="10dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tvParadaOrden"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:text="1"
+            android:gravity="center"
+            android:textStyle="bold"
+            android:fontFamily="@font/barlow_condensed_bold"
+            android:textSize="16sp"
+            android:background="@color/cp_accent_dim"
+            android:textColor="@color/cp_accent"
+            android:layout_marginEnd="12dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvParadaDireccion"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Parada"
+                android:textSize="15sp"
+                android:textColor="@color/cp_text_strong"
+                android:fontFamily="@font/barlow_condensed_bold" />
+
+            <TextView
+                android:id="@+id/tvParadaVentana"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Sin ventana horaria"
+                android:textSize="12sp"
+                android:textColor="@color/cp_text_muted"
+                android:paddingTop="2dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvParadaPaquetes"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Sin paquetes"
+        android:textSize="13sp"
+        android:textColor="@color/cp_text"
+        android:lineSpacingExtra="2dp"
+        android:paddingTop="10dp" />
+</LinearLayout>
