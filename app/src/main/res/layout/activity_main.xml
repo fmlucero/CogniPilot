@@ -162,82 +162,120 @@
             </LinearLayout>
         </ScrollView>
 
-        <!-- [1] MI RUTA (HU-56 — lista gráfica de paradas) ─────── -->
-        <ScrollView
+        <!-- [1] MI RUTA (HU-56 lista + HU-57 mapa OSM de paradas) ─────── -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:fillViewport="true">
+            android:orientation="vertical">
 
-            <LinearLayout
+            <!-- HU-57 — Mapa osmdroid: paradas numeradas, geocercas y posición.
+                 Altura fija arriba para que no compita por scroll con la lista.
+                 Se oculta cuando la ruta no tiene paradas con coordenadas. -->
+            <FrameLayout
+                android:id="@+id/mapMiRutaContainer"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:layout_height="260dp"
+                android:background="@color/cp_bg_elev">
 
-                <TextView
-                    android:id="@+id/tvRutaTitulo"
+                <org.osmdroid.views.MapView
+                    android:id="@+id/mapMiRuta"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Mi ruta del día"
-                    android:textSize="20sp"
-                    android:fontFamily="@font/barlow_condensed_bold"
-                    android:textColor="@color/cp_text_strong" />
+                    android:layout_height="match_parent" />
 
-                <TextView
-                    android:id="@+id/tvRutaResumen"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="—"
-                    android:textSize="13sp"
-                    android:textColor="@color/cp_text_muted"
-                    android:paddingTop="2dp"
-                    android:paddingBottom="14dp" />
+                <!-- Botón flotante: recentrar el mapa sobre la ruta + mi posición -->
+                <Button
+                    android:id="@+id/btnMapRecenter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_gravity="bottom|end"
+                    android:layout_margin="10dp"
+                    android:minWidth="0dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="🎯 Centrar"
+                    android:textAllCaps="false"
+                    android:textSize="12sp"
+                    android:backgroundTint="@color/cp_bg_elev_2"
+                    android:textColor="@color/cp_text" />
+            </FrameLayout>
 
-                <!-- Las cards de parada se inflan acá (item_parada.xml) -->
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:fillViewport="true">
+
                 <LinearLayout
-                    android:id="@+id/rutaContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-
-                <!-- Estado vacío -->
-                <LinearLayout
-                    android:id="@+id/rutaVacia"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:gravity="center"
-                    android:paddingTop="48dp"
-                    android:visibility="gone">
+                    android:padding="16dp">
 
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="🗺"
-                        android:textSize="48sp"
-                        android:paddingBottom="12dp" />
-
-                    <TextView
+                        android:id="@+id/tvRutaTitulo"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Sin ruta asignada para hoy"
-                        android:gravity="center"
-                        android:textSize="15sp"
+                        android:text="Mi ruta del día"
+                        android:textSize="20sp"
                         android:fontFamily="@font/barlow_condensed_bold"
-                        android:textColor="@color/cp_text_strong"
-                        android:paddingBottom="6dp" />
+                        android:textColor="@color/cp_text_strong" />
 
                     <TextView
+                        android:id="@+id/tvRutaResumen"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Cuando tu supervisor te asigne una ruta, vas a ver acá tus paradas, horarios y paquetes."
-                        android:gravity="center"
+                        android:text="—"
                         android:textSize="13sp"
                         android:textColor="@color/cp_text_muted"
-                        android:lineSpacingExtra="3dp" />
+                        android:paddingTop="2dp"
+                        android:paddingBottom="14dp" />
+
+                    <!-- Las cards de parada se inflan acá (item_parada.xml) -->
+                    <LinearLayout
+                        android:id="@+id/rutaContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+
+                    <!-- Estado vacío -->
+                    <LinearLayout
+                        android:id="@+id/rutaVacia"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:paddingTop="48dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="🗺"
+                            android:textSize="48sp"
+                            android:paddingBottom="12dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Sin ruta asignada para hoy"
+                            android:gravity="center"
+                            android:textSize="15sp"
+                            android:fontFamily="@font/barlow_condensed_bold"
+                            android:textColor="@color/cp_text_strong"
+                            android:paddingBottom="6dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Cuando tu supervisor te asigne una ruta, vas a ver acá tus paradas, horarios y paquetes."
+                            android:gravity="center"
+                            android:textSize="13sp"
+                            android:textColor="@color/cp_text_muted"
+                            android:lineSpacingExtra="3dp" />
+                    </LinearLayout>
                 </LinearLayout>
-            </LinearLayout>
-        </ScrollView>
+            </ScrollView>
+        </LinearLayout>
 
         <!-- [2] PERMISOS (HU-58 — estado visual por permiso) ───── -->
         <ScrollView

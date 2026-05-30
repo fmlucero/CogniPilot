@@ -9,6 +9,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -27,6 +28,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.osmdroid.config.Configuration
+import java.io.File
 
 /**
  * Pantalla principal del Monitor de Logística.
@@ -69,6 +72,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvRutaResumen: TextView
     private lateinit var rutaContainer: LinearLayout
     private lateinit var rutaVacia: View
+
+    // HU-57 — mapa OSM de "Mi Ruta"
+    private lateinit var mapContainer: FrameLayout
+    private lateinit var btnMapRecenter: Button
+    private lateinit var rutaMap: RutaMapController
 
     // HU-58 — sección "Permisos" (estado visual por permiso)
     private lateinit var tvPermResumen: TextView
@@ -140,6 +148,16 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // HU-57 — osmdroid debe configurarse ANTES de inflar el MapView. Los tile
+        // servers de OSM exigen un User-Agent identificable; el cache de tiles va a
+        // un dir privado de la app (sin permiso de almacenamiento externo).
+        Configuration.getInstance().apply {
+            userAgentValue = packageName
+            osmdroidBasePath = File(cacheDir, "osmdroid")
+            osmdroidTileCache = File(osmdroidBasePath, "tiles")
+        }
+
         setContentView(R.layout.activity_main)
 
         tvStatus = findViewById(R.id.tvStatus)
@@ -157,6 +175,11 @@ class MainActivity : AppCompatActivity() {
         tvRutaResumen = findViewById(R.id.tvRutaResumen)
         rutaContainer = findViewById(R.id.rutaContainer)
         rutaVacia = findViewById(R.id.rutaVacia)
+        // HU-57
+        mapContainer = findViewById(R.id.mapMiRutaContainer)
+        btnMapRecenter = findViewById(R.id.btnMapRecenter)
+        rutaMap = RutaMapController(findViewById(R.id.mapMiRuta), this)
+        rutaMap.init()
         // HU-58
         tvPermResumen = findViewById(R.id.tvPermResumen)
         tvPermOverlayState = findViewById(R.id.tvPermOverlayState)
@@ -192,6 +215,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        rutaMap.onResume()
         updateStatusDisplay()
         updateSessionDisplay()
         renderMiRuta()
@@ -225,6 +249,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        rutaMap.onPause()
         stopForegroundPolling()
         stopStatusAutoRefresh()
         realtimeClient.disconnect()
@@ -360,6 +385,9 @@ class MainActivity : AppCompatActivity() {
 
         btnLogout.setOnClickListener { onLogoutPressed() }
 
+        // HU-57 — recentrar el mapa sobre la ruta + mi posición.
+        btnMapRecenter.setOnClickListener { rutaMap.recenter() }
+
         // HU-58 — botones de la sección Permisos
         btnPermLocation.setOnClickListener {
             if (LocationReporter.hasPermission(this)) {
@@ -405,6 +433,8 @@ class MainActivity : AppCompatActivity() {
                 tvRutaResumen.text = "—"
                 rutaContainer.removeAllViews()
                 rutaVacia.visibility = View.VISIBLE
+                // HU-57 — sin ruta no hay nada que mapear.
+                mapContainer.visibility = View.GONE
                 return@launch
             }
             val paradas = meRepository.getParadasCached(ruta.id)
@@ -414,6 +444,11 @@ class MainActivity : AppCompatActivity() {
             tvRutaTitulo.text = ruta.nombre
             tvRutaResumen.text = "${ruta.fecha} · ${paradas.size} paradas · ${paquetes.size} paquetes"
             rutaVacia.visibility = if (paradas.isEmpty()) View.VISIBLE else View.GONE
+
+            // HU-57 — pintar paradas (orden de recorrido) + geocercas + mi posición.
+            // El mapa se oculta si ninguna parada tiene coordenadas geocodificadas.
+            rutaMap.render(paradas.sortedBy { it.orden }, LocationReporter.lastLatLng())
+            mapContainer.visibility = if (rutaMap.hasContent()) View.VISIBLE else View.GONE
 
             rutaContainer.removeAllViews()
             for (p in paradas) {
@@ -628,6 +663,12 @@ class MainActivity : AppCompatActivity() {
 
         // HU-58 — refrescar los estados visuales de la sección Permisos.
         updatePermisosDisplay()
+
+        // HU-57 — mantener el punto de "mi posición" al día en el mapa (sin repintar
+        // la ruta). Solo si ya hay paradas mapeadas y un fix GPS disponible.
+        if (rutaMap.hasContent()) {
+            LocationReporter.lastLatLng()?.let { rutaMap.updateMyPosition(it.first, it.second) }
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

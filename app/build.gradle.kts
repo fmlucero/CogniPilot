@@ -70,4 +70,7 @@ dependencies {
 
     // HU-41 — GPS reporting con FusedLocationProviderClient
     implementation(libs.play.services.location)
+
+    // HU-57 — mapa de "Mi Ruta" con OpenStreetMap (osmdroid, sin API key)
+    implementation(libs.osmdroid.android)
 }
