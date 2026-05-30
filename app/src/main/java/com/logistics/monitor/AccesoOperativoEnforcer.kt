@@ -38,9 +38,22 @@ object AccesoOperativoEnforcer {
         data class Denied(val ruleName: String, val reason: String) : Result()
     }
 
+    /**
+     * HU-59 — Estado de las condiciones de las reglas modo `kiosko`. El AAS lo
+     * combina con los permisos para decidir si levanta el bloqueo de jornada.
+     * `gpsFix` distingue "esperando GPS" de "fuera de zona" para el detalle.
+     */
+    data class KioskoEval(
+        val hasRule: Boolean,
+        val gpsFix: Boolean,
+        val zonaOk: Boolean,
+        val horarioOk: Boolean,
+        val detail: String,
+    )
+
     private data class Geo(val lat: Double, val lng: Double, val radiusM: Double)
     private data class Horario(val desde: LocalTime, val hasta: LocalTime)
-    private data class Parsed(val nombre: String, val geo: Geo?, val horario: Horario?)
+    private data class Parsed(val nombre: String, val modo: String, val geo: Geo?, val horario: Horario?)
 
     @Volatile private var rules: List<Parsed> = emptyList()
 
@@ -49,20 +62,23 @@ object AccesoOperativoEnforcer {
         rules = activas
             .filter { it.tipo == "acceso_operativo" && it.activa }
             .mapNotNull { parse(it) }
-        Log.i(TAG, "cache actualizado: ${rules.size} reglas app_trabajo")
+        Log.i(TAG, "cache actualizado: ${rules.size} reglas acceso_operativo (app_trabajo+kiosko)")
     }
 
     fun reset() { rules = emptyList() }
 
-    /** True si hay al menos una regla app_trabajo cacheada (para diagnóstico/UI). */
+    /** True si hay al menos una regla acceso_operativo cacheada. */
     fun hasRules(): Boolean = rules.isNotEmpty()
 
+    /** HU-59 — True si hay al menos una regla en modo kiosko (para mostrar el opt-in). */
+    fun hasKioskoRule(): Boolean = rules.any { it.modo == "kiosko" }
+
     /**
-     * Evalúa las reglas contra la posición y la hora actuales. Devuelve el
-     * primer fallo (Denied) o Allowed si todas pasan, o NoRule si no hay reglas.
+     * Evalúa las reglas modo `app_trabajo` contra la posición y hora actuales.
+     * Devuelve el primer fallo (Denied) o Allowed si todas pasan, o NoRule.
      */
     fun evaluate(): Result {
-        val snapshot = rules
+        val snapshot = rules.filter { it.modo == "app_trabajo" }
         if (snapshot.isEmpty()) return Result.NoRule
 
         val pos = LocationReporter.lastLatLng()
@@ -103,11 +119,64 @@ object AccesoOperativoEnforcer {
         }
     }
 
+    /**
+     * HU-59 — Evalúa las reglas modo `kiosko`: estado de zona y horario para que
+     * el AAS decida si mantener el bloqueo de jornada. zonaOk exige fix GPS y
+     * estar DENTRO de todas las geocercas kiosko (en kiosko sí bloqueamos sin
+     * fix, a diferencia de app_trabajo: el arranque debe confirmarse en zona).
+     */
+    fun evaluateKiosko(): KioskoEval {
+        val kioskoRules = rules.filter { it.modo == "kiosko" }
+        if (kioskoRules.isEmpty()) {
+            return KioskoEval(hasRule = false, gpsFix = false, zonaOk = true, horarioOk = true, detail = "")
+        }
+
+        val pos = LocationReporter.lastLatLng()
+        val now = LocalTime.now()
+        val gpsFix = pos != null
+
+        // Horario: todas las reglas con horario deben cumplirse.
+        var horarioOk = true
+        var horarioDetail = ""
+        for (r in kioskoRules) {
+            val h = r.horario ?: continue
+            if (!isWithin(now, h)) {
+                horarioOk = false
+                horarioDetail = "horario permitido ${h.desde}–${h.hasta}"
+                break
+            }
+        }
+
+        // Zona: todas las reglas con geo deben cumplirse (requiere fix GPS).
+        val geoRules = kioskoRules.filter { it.geo != null }
+        var zonaOk = true
+        var zonaDetail = ""
+        if (geoRules.isNotEmpty()) {
+            if (!gpsFix) {
+                zonaOk = false
+                zonaDetail = "esperando señal GPS…"
+            } else {
+                val (lat, lng) = pos!!
+                for (r in geoRules) {
+                    val g = r.geo!!
+                    val dist = haversineMeters(lat, lng, g.lat, g.lng)
+                    if (dist > g.radiusM) {
+                        zonaOk = false
+                        zonaDetail = "a ${dist.roundToInt()}m de la zona (radio ${g.radiusM.roundToInt()}m)"
+                        break
+                    }
+                }
+            }
+        }
+
+        val detail = listOf(zonaDetail, horarioDetail).filter { it.isNotBlank() }.joinToString(" · ")
+        return KioskoEval(hasRule = true, gpsFix = gpsFix, zonaOk = zonaOk, horarioOk = horarioOk, detail = detail)
+    }
+
     private fun parse(r: ReglaEntity): Parsed? {
         return try {
             val o = JSONObject(r.condicionJson)
-            // Solo enforcement estándar (HU-54). Kiosko (HU-59) es otra vía.
-            if (o.optString("modo", "app_trabajo") != "app_trabajo") return null
+            val modo = o.optString("modo", "app_trabajo")
 
             val geo = o.optJSONObject("geo")?.let { g ->
                 val lat = g.optDouble("lat", Double.NaN)
@@ -127,7 +196,7 @@ object AccesoOperativoEnforcer {
                 Log.w(TAG, "⚠️ regla '${r.nombre}' sin geo ni horario evaluables: ${r.condicionJson}")
                 null
             } else {
-                Parsed(r.nombre, geo, horario)
+                Parsed(r.nombre, modo, geo, horario)
             }
         } catch (e: Exception) {
             Log.w(TAG, "⚠️ regla '${r.nombre}' condicion inválida: ${e.message}")

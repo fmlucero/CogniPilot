@@ -71,11 +71,17 @@ class LogisticsAccessibilityService : AccessibilityService() {
         fun applyGlobalMode(enabled: Boolean) {
             instance?.configurePackageFilter(enabled)
         }
+
+        /** HU-59 — llamado desde MainActivity al iniciar/salir del modo kiosko. */
+        fun applyKioskoMode(enabled: Boolean) {
+            instance?.onKioskoModeChanged(enabled)
+        }
     }
 
     private lateinit var overlayManager: OverlayManager
     private lateinit var scheduleRepository: ScheduleRepository
     private lateinit var globalModeRepository: GlobalModeRepository
+    private lateinit var kioskoModeRepository: KioskoModeRepository
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var warningShown = false
@@ -115,6 +121,23 @@ class LogisticsAccessibilityService : AccessibilityService() {
         }
     }
 
+    // HU-59 — ticker del modo kiosko: re-evalúa zona/horario/permisos cada
+    // KIOSKO_INTERVAL mientras el modo está activo, y muestra/quita el overlay
+    // full-screen de bloqueo. Corre independiente de qué app esté en foreground.
+    private val KIOSKO_INTERVAL_MS = 5_000L
+    @Volatile private var kioskoEnabled = false
+    private val kioskoRunnable = object : Runnable {
+        override fun run() {
+            try {
+                evaluateKioskoAndRender()
+            } catch (e: Exception) {
+                Log.w(TAG, "ticker kiosko: ${e.message}")
+            } finally {
+                if (kioskoEnabled) mainHandler.postDelayed(this, KIOSKO_INTERVAL_MS)
+            }
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Ciclo de vida
     // ─────────────────────────────────────────────────────────────────────────
@@ -124,6 +147,8 @@ class LogisticsAccessibilityService : AccessibilityService() {
         overlayManager = OverlayManager(this)
         scheduleRepository = ScheduleRepository(this)
         globalModeRepository = GlobalModeRepository(this)
+        kioskoModeRepository = KioskoModeRepository(this)
+        kioskoEnabled = kioskoModeRepository.isEnabled()
         isServiceConnected = true
         instance = this
 
@@ -151,6 +176,10 @@ class LogisticsAccessibilityService : AccessibilityService() {
 
         // HU-54 — arrancar el ticker de enforcement de acceso operativo.
         mainHandler.postDelayed(enforceRunnable, ENFORCE_INTERVAL_MS)
+        // HU-59 — si la jornada kiosko quedó activa, retomar el bloqueo.
+        if (kioskoEnabled) {
+            mainHandler.post(kioskoRunnable)
+        }
     }
 
     /**
@@ -170,10 +199,84 @@ class LogisticsAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         mainHandler.removeCallbacks(enforceRunnable)
-        if (::overlayManager.isInitialized) overlayManager.removeAllOverlays()
+        mainHandler.removeCallbacks(kioskoRunnable)
+        if (::overlayManager.isInitialized) {
+            overlayManager.removeAllOverlays()
+            overlayManager.removeKioskoOverlay()
+        }
         isServiceConnected = false
         instance = null
         Log.i(TAG, "🔴 Servicio destruido")
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // HU-59 — Modo kiosko de jornada
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Llamado vía companion cuando el usuario inicia/sale del modo kiosko. */
+    private fun onKioskoModeChanged(enabled: Boolean) {
+        kioskoEnabled = enabled
+        mainHandler.removeCallbacks(kioskoRunnable)
+        if (enabled) {
+            Log.i(TAG, "🔒 Modo kiosko ACTIVADO")
+            mainHandler.post(kioskoRunnable)   // evalúa y muestra ya mismo
+        } else {
+            Log.i(TAG, "🔓 Modo kiosko DESACTIVADO")
+            mainHandler.post { overlayManager.removeKioskoOverlay() }
+        }
+    }
+
+    /**
+     * Evalúa zona + horario (reglas kiosko) + permisos y muestra/actualiza o
+     * quita el overlay de bloqueo. El desbloqueo requiere las tres cosas.
+     */
+    private fun evaluateKioskoAndRender() {
+        if (!kioskoEnabled) {
+            mainHandler.post { overlayManager.removeKioskoOverlay() }
+            return
+        }
+        val ev = AccesoOperativoEnforcer.evaluateKiosko()
+        if (!ev.hasRule) {
+            // La empresa no tiene reglas kiosko (o se desactivaron) → sin bloqueo.
+            mainHandler.post { overlayManager.removeKioskoOverlay() }
+            return
+        }
+        val permisosOk = LocationReporter.hasPermission(this) && LogisticsMonitoringService.isRunning
+        val unlocked = ev.zonaOk && ev.horarioOk && permisosOk
+
+        val detail = buildString {
+            if (ev.detail.isNotBlank()) append(ev.detail)
+            if (!permisosOk) {
+                if (isNotEmpty()) append(" · ")
+                append("activá ubicación y el monitor")
+            }
+        }
+
+        mainHandler.post {
+            if (unlocked) {
+                if (overlayManager.isKioskoShowing()) {
+                    overlayManager.removeKioskoOverlay()
+                    Toast.makeText(this, "✅ Jornada habilitada — ya podés trabajar", Toast.LENGTH_LONG).show()
+                }
+            } else {
+                overlayManager.showOrUpdateKioskoOverlay(
+                    zonaOk = ev.zonaOk,
+                    horarioOk = ev.horarioOk,
+                    permisosOk = permisosOk,
+                    detail = detail,
+                    onExit = { disableKioskoFromOverlay() },
+                )
+            }
+        }
+    }
+
+    /** Salida manual desde el botón del overlay kiosko. */
+    private fun disableKioskoFromOverlay() {
+        kioskoModeRepository.setEnabled(false)
+        kioskoEnabled = false
+        mainHandler.removeCallbacks(kioskoRunnable)
+        overlayManager.removeKioskoOverlay()
+        Toast.makeText(this, "Saliste del modo jornada", Toast.LENGTH_SHORT).show()
     }
 
     // ─────────────────────────────────────────────────────────────────────────

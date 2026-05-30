@@ -159,6 +159,47 @@
                     android:letterSpacing="0.03"
                     android:backgroundTint="@color/cp_bg_elev_2"
                     android:textColor="@color/cp_text" />
+
+                <!-- HU-59 — Modo kiosko de jornada. Sólo visible si la empresa
+                     tiene una regla acceso_operativo en modo kiosko. -->
+                <LinearLayout
+                    android:id="@+id/kioskoSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingTop="24dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="JORNADA · MODO KIOSKO"
+                        android:textSize="11sp"
+                        android:letterSpacing="0.14"
+                        android:textColor="@color/cp_text_faint"
+                        android:paddingBottom="6dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Tu empresa pide arrancar la jornada en zona y horario. Al iniciar, el teléfono queda bloqueado hasta que estés listo."
+                        android:textSize="12sp"
+                        android:textColor="@color/cp_text_muted"
+                        android:lineSpacingExtra="2dp"
+                        android:paddingBottom="8dp" />
+
+                    <Button
+                        android:id="@+id/btnToggleKiosko"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:text="🔒 Iniciar jornada (kiosko)"
+                        android:textAllCaps="false"
+                        android:fontFamily="@font/barlow_condensed_bold"
+                        android:textSize="15sp"
+                        android:letterSpacing="0.03"
+                        android:backgroundTint="@color/cp_bg_elev_2"
+                        android:textColor="@color/cp_text" />
+                </LinearLayout>
             </LinearLayout>
         </ScrollView>
 

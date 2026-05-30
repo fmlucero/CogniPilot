@@ -60,6 +60,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnToggleGlobal: Button
     private lateinit var globalModeRepository: GlobalModeRepository
 
+    // HU-59 — modo kiosko de jornada
+    private lateinit var kioskoSection: LinearLayout
+    private lateinit var btnToggleKiosko: Button
+    private lateinit var kioskoModeRepository: KioskoModeRepository
+
     // HU-55 — navegación por pestañas. El ViewFlipper alterna las 4 secciones
     // (Inicio/Mi Ruta/Permisos/Perfil) sin fragments: la lógica sigue viviendo
     // en esta Activity, sólo cambia qué sección está visible.
@@ -190,6 +195,10 @@ class MainActivity : AppCompatActivity() {
         btnPermLocation = findViewById(R.id.btnPermLocation)
         btnPermNotif = findViewById(R.id.btnPermNotif)
         globalModeRepository = GlobalModeRepository(this)
+        // HU-59
+        kioskoSection = findViewById(R.id.kioskoSection)
+        btnToggleKiosko = findViewById(R.id.btnToggleKiosko)
+        kioskoModeRepository = KioskoModeRepository(this)
         meRepository = MeRepository(this)
 
         setupTabs()
@@ -388,6 +397,9 @@ class MainActivity : AppCompatActivity() {
         // HU-57 — recentrar el mapa sobre la ruta + mi posición.
         btnMapRecenter.setOnClickListener { rutaMap.recenter() }
 
+        // HU-59 — iniciar/salir del modo kiosko de jornada.
+        btnToggleKiosko.setOnClickListener { onToggleKiosko() }
+
         // HU-58 — botones de la sección Permisos
         btnPermLocation.setOnClickListener {
             if (LocationReporter.hasPermission(this)) {
@@ -564,6 +576,52 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * HU-59 — toggle del modo kiosko. Para activarlo exige los prerequisitos que
+     * permiten mostrar el overlay de bloqueo (overlay + accesibilidad) y arrancar
+     * el monitor; si faltan, redirige a configurarlos en vez de activar a ciegas.
+     */
+    private fun onToggleKiosko() {
+        val enabling = !kioskoModeRepository.isEnabled()
+        if (enabling) {
+            if (!Settings.canDrawOverlays(this) || !LogisticsAccessibilityService.isServiceConnected) {
+                Toast.makeText(this, "⚠️ Primero otorgá overlay y accesibilidad (pestaña Permisos)", Toast.LENGTH_LONG).show()
+                bottomNav.selectedItemId = R.id.tab_permisos
+                return
+            }
+            // El monitor debe estar corriendo para que el GPS y la evaluación
+            // continua funcionen mientras dure la jornada.
+            if (!LogisticsMonitoringService.isRunning) {
+                startMonitoringService()
+            }
+            kioskoModeRepository.setEnabled(true)
+            LogisticsAccessibilityService.applyKioskoMode(true)
+            Toast.makeText(this, "🔒 Jornada iniciada — el teléfono se desbloquea en zona y horario", Toast.LENGTH_LONG).show()
+        } else {
+            kioskoModeRepository.setEnabled(false)
+            LogisticsAccessibilityService.applyKioskoMode(false)
+            Toast.makeText(this, "🔓 Saliste del modo jornada", Toast.LENGTH_SHORT).show()
+        }
+        updateKioskoButton()
+    }
+
+    /**
+     * HU-59 — muestra la sección kiosko sólo si la empresa tiene una regla
+     * acceso_operativo en modo kiosko, y refleja el estado en el botón.
+     */
+    private fun updateKioskoButton() {
+        val hasRule = AccesoOperativoEnforcer.hasKioskoRule()
+        kioskoSection.visibility = if (hasRule) View.VISIBLE else View.GONE
+        val enabled = kioskoModeRepository.isEnabled()
+        btnToggleKiosko.text = if (enabled) "🔓 Salir del modo jornada" else "🔒 Iniciar jornada (kiosko)"
+        btnToggleKiosko.backgroundTintList = ContextCompat.getColorStateList(
+            this, if (enabled) R.color.cp_accent else R.color.cp_bg_elev_2
+        )
+        btnToggleKiosko.setTextColor(
+            ContextCompat.getColor(this, if (enabled) R.color.cp_accent_text else R.color.cp_text)
+        )
+    }
+
     private fun updateGlobalButtonLabel() {
         val enabled = globalModeRepository.isEnabled()
         btnToggleGlobal.text = if (enabled) "🌐 Modo global: ON" else "🌐 Modo global: OFF"
@@ -669,6 +727,9 @@ class MainActivity : AppCompatActivity() {
         if (rutaMap.hasContent()) {
             LocationReporter.lastLatLng()?.let { rutaMap.updateMyPosition(it.first, it.second) }
         }
+
+        // HU-59 — mostrar/ocultar el opt-in de kiosko según haya regla kiosko.
+        updateKioskoButton()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HU-59 — Overlay full-screen de "modo kiosko de jornada". Bloquea el teléfono
+     (cubre toda la pantalla y captura el toque) hasta que se cumplan zona +
+     horario + permisos. Muestra un checklist en vivo + un botón de salida. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="@color/cp_bg"
+    android:padding="28dp"
+    android:elevation="32dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🔒"
+        android:textSize="48sp"
+        android:paddingBottom="12dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="MODO JORNADA"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:fontFamily="@font/barlow_condensed_bold"
+        android:letterSpacing="0.10"
+        android:textColor="@color/cp_text_strong"
+        android:gravity="center" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="El teléfono se desbloquea cuando estés listo para arrancar:"
+        android:textSize="14sp"
+        android:textColor="@color/cp_text_muted"
+        android:gravity="center"
+        android:lineSpacingExtra="3dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="20dp" />
+
+    <!-- Checklist -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@color/cp_bg_elev"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/tvKioskoZona"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="… En la zona permitida"
+            android:textSize="15sp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp" />
+
+        <TextView
+            android:id="@+id/tvKioskoHorario"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="… En el horario permitido"
+            android:textSize="15sp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp" />
+
+        <TextView
+            android:id="@+id/tvKioskoPermisos"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="… Permisos y monitor activos"
+            android:textSize="15sp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvKioskoDetail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="13sp"
+        android:textColor="@color/cp_warning"
+        android:gravity="center"
+        android:paddingTop="14dp"
+        android:lineSpacingExtra="2dp" />
+
+    <Button
+        android:id="@+id/btnKioskoExit"
+        android:layout_width="wrap_content"
+        android:layout_height="44dp"
+        android:text="Salir del modo jornada"
+        android:textAllCaps="false"
+        android:textSize="13sp"
+        android:layout_marginTop="28dp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:backgroundTint="@color/cp_bg_elev_2"
+        android:textColor="@color/cp_text_muted" />
+
+</LinearLayout>
