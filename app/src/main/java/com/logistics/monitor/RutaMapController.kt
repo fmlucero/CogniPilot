@@ -175,4 +175,7 @@ class RutaMapController(
 
     /** True si hay al menos una parada con coordenadas para mostrar. */
     fun hasContent(): Boolean = routePoints.isNotEmpty()
+
+    /** True si el marcador de "mi posición" está colocado en el mapa. */
+    fun hasMyPosition(): Boolean = meMarker != null
 }

@@ -442,11 +442,14 @@ class MainActivity : AppCompatActivity() {
             val ruta = meRepository.getRutaCached()
             if (ruta == null) {
                 tvRutaTitulo.text = "Mi ruta del día"
-                tvRutaResumen.text = "—"
+                tvRutaResumen.text = "Sin ruta asignada para hoy"
                 rutaContainer.removeAllViews()
                 rutaVacia.visibility = View.VISIBLE
-                // HU-57 — sin ruta no hay nada que mapear.
-                mapContainer.visibility = View.GONE
+                // HU-57 — aunque no haya ruta, mostramos el mapa centrado en tu
+                // ubicación actual: queda más vivo y profesional que un panel vacío.
+                val mePos = LocationReporter.lastLatLng()
+                rutaMap.render(emptyList(), mePos)
+                mapContainer.visibility = if (rutaMap.hasMyPosition()) View.VISIBLE else View.GONE
                 return@launch
             }
             val paradas = meRepository.getParadasCached(ruta.id)
@@ -460,7 +463,8 @@ class MainActivity : AppCompatActivity() {
             // HU-57 — pintar paradas (orden de recorrido) + geocercas + mi posición.
             // El mapa se oculta si ninguna parada tiene coordenadas geocodificadas.
             rutaMap.render(paradas.sortedBy { it.orden }, LocationReporter.lastLatLng())
-            mapContainer.visibility = if (rutaMap.hasContent()) View.VISIBLE else View.GONE
+            mapContainer.visibility =
+                if (rutaMap.hasContent() || rutaMap.hasMyPosition()) View.VISIBLE else View.GONE
 
             rutaContainer.removeAllViews()
             for (p in paradas) {
@@ -723,9 +727,14 @@ class MainActivity : AppCompatActivity() {
         updatePermisosDisplay()
 
         // HU-57 — mantener el punto de "mi posición" al día en el mapa (sin repintar
-        // la ruta). Solo si ya hay paradas mapeadas y un fix GPS disponible.
-        if (rutaMap.hasContent()) {
-            LocationReporter.lastLatLng()?.let { rutaMap.updateMyPosition(it.first, it.second) }
+        // la ruta). Si el mapa estaba oculto por no tener fix todavía (caso sin ruta),
+        // lo mostramos y encuadramos al llegar el primer fix GPS.
+        LocationReporter.lastLatLng()?.let { (lat, lng) ->
+            rutaMap.updateMyPosition(lat, lng)
+            if (mapContainer.visibility != View.VISIBLE) {
+                mapContainer.visibility = View.VISIBLE
+                rutaMap.recenter()
+            }
         }
 
         // HU-59 — mostrar/ocultar el opt-in de kiosko según haya regla kiosko.
