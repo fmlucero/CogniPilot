@@ -24,11 +24,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.LogisticsMonitor">
 
-        <!-- Preload de fuentes Google (Barlow Condensed) — evita parpadeo -->
-        <meta-data
-            android:name="preloaded_fonts"
-            android:resource="@array/preloaded_fonts" />
-
         <!-- HU-03: SplashActivity es el nuevo launcher; decide login vs main -->
         <activity
             android:name=".ui.SplashActivity"
