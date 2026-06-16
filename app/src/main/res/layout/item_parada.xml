@@ -7,7 +7,10 @@
     android:orientation="vertical"
     android:background="@color/cp_bg_elev"
     android:padding="14dp"
-    android:layout_marginBottom="10dp">
+    android:layout_marginBottom="10dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?android:attr/selectableItemBackground">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -52,6 +55,21 @@
                 android:textColor="@color/cp_text_muted"
                 android:paddingTop="2dp" />
         </LinearLayout>
+
+        <!-- HU-60 — abre Google Maps con navegación turn-by-turn a esta parada. -->
+        <Button
+            android:id="@+id/btnParadaNavegar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🧭 Ir"
+            android:textSize="13sp"
+            android:textColor="@color/cp_accent"
+            android:textStyle="bold"
+            android:background="@color/cp_accent_dim"
+            android:paddingHorizontal="14dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:layout_marginStart="8dp" />
     </LinearLayout>
 
     <TextView

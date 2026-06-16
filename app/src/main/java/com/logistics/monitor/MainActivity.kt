@@ -488,8 +488,55 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 card.findViewById<TextView>(R.id.tvParadaPaquetes).text = pqText
+
+                // HU-60 — tocar la card centra el mapa en esta parada y abre su info.
+                val tieneCoords = p.lat != 0.0 || p.lng != 0.0
+                card.setOnClickListener {
+                    if (!rutaMap.focusOnParada(p.id)) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Esta parada no tiene ubicación en el mapa todavía",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+
+                // HU-60 — "Ir": navegación turn-by-turn en Google Maps (por coordenadas).
+                val btnNavegar = card.findViewById<Button>(R.id.btnParadaNavegar)
+                btnNavegar.visibility = if (tieneCoords) View.VISIBLE else View.GONE
+                btnNavegar.setOnClickListener { abrirNavegacion(p.lat, p.lng, p.direccion) }
+
                 rutaContainer.addView(card)
             }
+        }
+    }
+
+    /**
+     * HU-60 — Abre navegación turn-by-turn a una parada. Usa coordenadas (no la
+     * dirección de texto) para evitar el geocoding ambiguo de Nominatim (I-29).
+     * Cadena de fallbacks: Google Maps → cualquier app `geo:` → Maps web.
+     */
+    private fun abrirNavegacion(lat: Double, lng: Double, direccion: String?) {
+        val nav = Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=$lat,$lng"))
+            .setPackage("com.google.android.apps.maps")
+        try {
+            startActivity(nav)
+            return
+        } catch (_: Exception) { /* Maps no instalado; probamos genérico */ }
+        try {
+            val label = direccion?.takeIf { it.isNotBlank() }?.let { "(${Uri.encode(it)})" } ?: ""
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lng?q=$lat,$lng$label")))
+            return
+        } catch (_: Exception) { /* sin app de mapas; vamos al navegador */ }
+        try {
+            startActivity(
+                Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng"),
+                )
+            )
+        } catch (_: Exception) {
+            Toast.makeText(this, "No hay app para abrir el mapa", Toast.LENGTH_SHORT).show()
         }
     }
 

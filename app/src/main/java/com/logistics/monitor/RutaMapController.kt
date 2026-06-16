@@ -37,6 +37,8 @@ class RutaMapController(
 
     private var meMarker: Marker? = null
     private var routePoints: List<GeoPoint> = emptyList()
+    // Markers de parada por id, para poder centrar el mapa al tocar su card (interactividad HU-60).
+    private val paradaMarkers = LinkedHashMap<String, Marker>()
     private var initialized = false
 
     /** Configura el tile source y los gestos. Idempotente. */
@@ -66,6 +68,7 @@ class RutaMapController(
 
         map.overlays.clear()
         meMarker = null
+        paradaMarkers.clear()
 
         val pts = validas.map { GeoPoint(it.lat, it.lng) }
 
@@ -109,6 +112,7 @@ class RutaMapController(
                 }.trim()
             }
             map.overlays.add(marker)
+            paradaMarkers[p.id] = marker
         }
 
         routePoints = pts
@@ -146,6 +150,23 @@ class RutaMapController(
         }
         meMarker = marker
         map.overlays.add(marker)
+    }
+
+    /**
+     * Centra y hace zoom sobre una parada concreta y abre su info window.
+     * Llamado al tocar la card de la parada en la lista (interactividad HU-60).
+     * No-op si la parada no tiene marker (sin coordenadas válidas).
+     */
+    fun focusOnParada(paradaId: String): Boolean {
+        if (!initialized) return false
+        val marker = paradaMarkers[paradaId] ?: return false
+        // Cerramos cualquier info window abierto antes de abrir el de esta parada.
+        for (m in paradaMarkers.values) m.closeInfoWindow()
+        map.controller.setZoom(17.0)
+        map.controller.animateTo(marker.position)
+        marker.showInfoWindow()
+        map.invalidate()
+        return true
     }
 
     /** Encuadra el mapa sobre todas las paradas + mi posición. */
