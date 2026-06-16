@@ -10,9 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -136,9 +136,15 @@ object EventReporter {
         }
     }
 
-    /** Cuántos eventos esperan offline — para diagnóstico en MainActivity. */
-    fun pendingCount(context: Context): Int = try {
-        runBlocking(Dispatchers.IO) {
+    /**
+     * Cuántos eventos esperan offline — para diagnóstico en MainActivity.
+     * `suspend` + `withContext(IO)` (NO `runBlocking`): se llama desde el hilo
+     * principal y `runBlocking` lo bloqueaba hasta que la query de Room terminara,
+     * lo que colgaba la UI cuando había contención de DB (sync de ruta/reglas +
+     * drenado de eventos offline). Ver I-30.
+     */
+    suspend fun pendingCount(context: Context): Int = try {
+        withContext(Dispatchers.IO) {
             AppDatabase.get(context.applicationContext).eventoOfflineDao().count()
         }
     } catch (_: Exception) { 0 }

@@ -95,6 +95,10 @@ class MainActivity : AppCompatActivity() {
 
     private var foregroundPollJob: Job? = null
     private var statusRefreshJob: Job? = null
+    // I-30 — conteo de eventos offline cacheado. updateStatusDisplay() corre en el
+    // hilo principal; el conteo se refresca de forma asíncrona (suspend, off-main)
+    // para no bloquear la UI con una query de Room.
+    @Volatile private var pendingOfflineCount = 0
     private lateinit var realtimeClient: RealtimeStreamClient
     private lateinit var meRepository: MeRepository
 
@@ -274,8 +278,11 @@ class MainActivity : AppCompatActivity() {
         statusRefreshJob?.cancel()
         statusRefreshJob = lifecycleScope.launch {
             while (isActive) {
-                delay(3_000L)
+                // I-30 — refrescar el conteo offline fuera del hilo principal
+                // (pendingCount es suspend con withContext(IO)) antes de pintar.
+                pendingOfflineCount = EventReporter.pendingCount(this@MainActivity)
                 updateStatusDisplay()
+                delay(3_000L)
             }
         }
     }
@@ -735,7 +742,7 @@ class MainActivity : AppCompatActivity() {
         val lastFixAt = LocationReporter.lastFixAtMs()
         val lastPostCode = LocationReporter.lastPostStatusCode()
 
-        val pendingOffline = EventReporter.pendingCount(this)
+        val pendingOffline = pendingOfflineCount
         val statusLines = buildString {
             appendLine(if (overlayOk) "✅ Permiso overlay: OK" else "❌ Permiso overlay: FALTA")
             appendLine(if (accessibilityOk) "✅ Accesibilidad: ACTIVA" else "❌ Accesibilidad: INACTIVA")
