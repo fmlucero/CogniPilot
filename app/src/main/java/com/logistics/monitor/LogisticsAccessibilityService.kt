@@ -76,6 +76,19 @@ class LogisticsAccessibilityService : AccessibilityService() {
         fun applyKioskoMode(enabled: Boolean) {
             instance?.onKioskoModeChanged(enabled)
         }
+
+        /**
+         * Fix I-28 — llamado desde MainActivity.onResume(). Si el usuario está
+         * viendo NUESTRA propia app, ningún overlay de bloqueo del work-app debe
+         * quedar pegado encima. El filtrado por evento de accesibilidad trata a
+         * nuestro propio package como "transient" y NO disparaba resetState(),
+         * así que un overlay mostrado para Envíos SC Pack quedaba "congelando"
+         * CogniPilot al volver a ella. Esto lo limpia de forma determinística.
+         * No toca el overlay kiosko (ese tiene su propio ciclo de vida).
+         */
+        fun clearOverlaysForOwnApp() {
+            instance?.resetState()
+        }
     }
 
     private lateinit var overlayManager: OverlayManager

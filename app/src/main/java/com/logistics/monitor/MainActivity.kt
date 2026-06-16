@@ -224,6 +224,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Fix I-28 — si volvemos a nuestra propia UI, ningún overlay de bloqueo
+        // del work-app puede quedar pegado encima (causaba el "congelamiento"
+        // recurrente de CogniPilot). No-op si el servicio no está activo.
+        LogisticsAccessibilityService.clearOverlaysForOwnApp()
         rutaMap.onResume()
         updateStatusDisplay()
         updateSessionDisplay()
