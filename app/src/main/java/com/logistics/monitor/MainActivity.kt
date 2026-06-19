@@ -158,6 +158,11 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Diagnóstico I-31 — arrancar el watchdog del hilo principal lo antes
+        // posible para capturar el cuelgue al cargar la ruta (reporta el stack
+        // del main al backend; ver MainThreadWatchdog).
+        MainThreadWatchdog.start(this)
+
         // HU-57 — osmdroid debe configurarse ANTES de inflar el MapView. Los tile
         // servers de OSM exigen un User-Agent identificable; el cache de tiles va a
         // un dir privado de la app (sin permiso de almacenamiento externo).
@@ -295,6 +300,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         LogisticsMonitoringService.onStateChange = null
+        MainThreadWatchdog.stop()
     }
 
     /**
