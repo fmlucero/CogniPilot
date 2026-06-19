@@ -334,34 +334,34 @@ class LogisticsAccessibilityService : AccessibilityService() {
             if (enforceAccesoOperativo()) return
         }
 
-        val snapshot = scheduleRepository.load()
+        // HU-42 — Los clics de escaneo se evalúan SIEMPRE, independientemente del
+        // horario. La geocerca es una regla espacial: escanear fuera de la zona se
+        // bloquea aunque el horario sea permitido (y la ventana horaria bloquea
+        // aunque estés dentro de la zona). Son reglas independientes; quien las
+        // combina para decidir es onQRScanDetected.
+        if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            checkClickedNode(event)
+            return
+        }
 
-        // Lógica de Prioridad:
-        // 1. Si hay restricción remota (enabled=true), ella manda (bloquea fuera de horario, permite dentro).
-        // 2. Si NO hay restricción remota, manda el switch local.
-        val shouldBlock = if (snapshot.enabled) {
+        // ── TYPE_WINDOW_STATE_CHANGED → cartel de horario (regla ventana_horaria) ──
+        val snapshot = scheduleRepository.load()
+        // Si hay restricción remota (enabled=true), bloquea fuera de horario; si
+        // no, manda el switch local del monitor.
+        val outOfSchedule = if (snapshot.enabled) {
             !snapshot.isNowInPermittedRange()
         } else {
             LogisticsMonitoringService.isRunning
         }
 
-        if (!shouldBlock) {
+        if (!outOfSchedule) {
             if (targetAppActive || warningShown || blockingShown) resetState()
             return
         }
 
-        when (event.eventType) {
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                if (!targetAppActive) {
-                    targetAppActive = true
-                    onTargetAppOpened(event)
-                }
-            }
-            AccessibilityEvent.TYPE_VIEW_CLICKED -> {
-                if (targetAppActive) {
-                    checkClickedNode(event)
-                }
-            }
+        if (!targetAppActive) {
+            targetAppActive = true
+            onTargetAppOpened(event)
         }
     }
 
@@ -554,22 +554,40 @@ class LogisticsAccessibilityService : AccessibilityService() {
 
     private fun onQRScanDetected(allTexts: List<String>, detectedKeywords: List<String>) {
         if (blockingShown) return
-        blockingShown = true
 
-        val contextStr = allTexts.filter { text ->
-            detectedKeywords.any { kw -> text.contains(kw, ignoreCase = true) }
-        }.take(5).joinToString("\n• ", prefix = "• ")
-
-        Log.i(TAG, "🚫 BLOQUEO QR — keywords: $detectedKeywords")
-
+        // HU-42 — Decisión INDEPENDIENTE: la geocerca (espacial) y la ventana
+        // horaria (temporal) son reglas separadas; cualquiera de las dos puede
+        // bloquear el escaneo. Solo se permite si estás DENTRO de la zona Y en
+        // horario permitido.
+        val geo = GeofenceEvaluator.evaluateForScan()
+        val geoOutside = geo is GeofenceEvaluator.Result.Outside
         val snap = scheduleRepository.load()
         val inSchedule = if (snap.enabled) snap.isNowInPermittedRange() else null
+        val outOfSchedule = if (snap.enabled) {
+            !snap.isNowInPermittedRange()
+        } else {
+            LogisticsMonitoringService.isRunning
+        }
+
+        // Telemetría: el intento de escaneo se reporta siempre.
         EventReporter.report(
             this,
             EventReporter.TYPE_SCAN_DETECTED,
             keywords = detectedKeywords,
             inSchedule = inSchedule,
         )
+
+        if (!geoOutside && !outOfSchedule) {
+            Log.i(TAG, "✅ Escaneo permitido — dentro de zona y en horario")
+            return
+        }
+
+        blockingShown = true
+        Log.i(TAG, "🚫 BLOQUEO escaneo — geoOutside=$geoOutside outOfSchedule=$outOfSchedule keywords=$detectedKeywords")
+
+        val contextStr = allTexts.filter { text ->
+            detectedKeywords.any { kw -> text.contains(kw, ignoreCase = true) }
+        }.take(5).joinToString("\n• ", prefix = "• ")
 
         val (title, message) = buildScanOverlayContent(contextStr)
 
