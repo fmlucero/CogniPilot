@@ -78,6 +78,18 @@ object ParadaProximityWatcher {
         }
     }
 
+    /**
+     * Distancia (m) a la parada geocodificada más cercana de la ruta cacheada,
+     * o null si no hay ruta cargada / ninguna parada con coordenadas. Lo usa
+     * [GeofenceEvaluator] para medir la geocerca contra la parada real del día
+     * en vez de contra un punto fijo de la regla.
+     */
+    fun nearestParadaDistanceM(lat: Double, lng: Double): Double? {
+        val valid = paradas.filter { it.parada.lat != 0.0 || it.parada.lng != 0.0 }
+        if (valid.isEmpty()) return null
+        return valid.minOf { haversineMeters(lat, lng, it.parada.lat, it.parada.lng) }
+    }
+
     private fun showNudgeFor(context: Context, p: ParadaConPaquetes) {
         // Llamamos al AAS si está instanciado — usa su OverlayManager privado.
         // Si no, fallback a un Toast (la app puede no estar en foreground del

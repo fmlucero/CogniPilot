@@ -46,11 +46,15 @@ object GeofenceEvaluator {
         if (rules.isEmpty()) return Result.NoRule
         val pos = LocationReporter.lastLatLng() ?: return Result.NoLocation
         val (lat, lng) = pos
+        // La distancia se mide a la PARADA MÁS CERCANA de la ruta del día (lo que
+        // el repartidor realmente tiene que entregar). Si no hay ruta cargada, se
+        // cae al punto fijo de la regla (compat con la HU-42 original).
+        val nearestDist = ParadaProximityWatcher.nearestParadaDistanceM(lat, lng)
         for (r in rules) {
             val (tLat, tLng, radius) = parseCondicion(r) ?: continue
-            val dist = haversineMeters(lat, lng, tLat, tLng)
+            val dist = nearestDist ?: haversineMeters(lat, lng, tLat, tLng)
             if (dist > radius) {
-                Log.i(TAG, "🚷 Geofence FALLA — regla='${r.nombre}' dist=${"%.1f".format(dist)}m radio=${radius}m")
+                Log.i(TAG, "🚷 Geofence FALLA — regla='${r.nombre}' dist=${"%.1f".format(dist)}m radio=${radius}m (parada_cercana=${nearestDist != null})")
                 return Result.Outside(r.nombre, r.accion, dist, radius)
             }
         }

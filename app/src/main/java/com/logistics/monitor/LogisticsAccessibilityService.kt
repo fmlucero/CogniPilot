@@ -531,23 +531,22 @@ class LogisticsAccessibilityService : AccessibilityService() {
      * continuar (la decisión final sigue siendo del repartidor: HU-08
      * dejó el flujo "Continuar igual / Cancelar" como UX no-coercitiva).
      */
-    private fun buildScanOverlayContent(contextStr: String): Pair<String, String> {
-        val geo = GeofenceEvaluator.evaluateForScan()
+    private fun buildScanOverlayContent(geo: GeofenceEvaluator.Result): Pair<String, String> {
         return when (geo) {
             is GeofenceEvaluator.Result.Outside -> {
                 val verbo = if (geo.accion == "bloquear") "🚫 ESCANEO FUERA DE ZONA"
                             else "⚠️ ESCANEO FUERA DE ZONA"
                 val nota = if (geo.accion == "bloquear")
-                    "\n\n🚷 Regla \"${geo.ruleName}\" exige escanear DENTRO del radio."
+                    "\n\n🚷 Regla \"${geo.ruleName}\" exige escanear cerca de la parada."
                 else
-                    "\n\n📍 Regla \"${geo.ruleName}\": estás escaneando fuera del radio recomendado."
-                verbo to "Se detectaron elementos de escaneo:\n$contextStr\n\n📡 Estás a ${"%.0f".format(geo.distanceM)}m del centro (radio: ${"%.0f".format(geo.radiusM)}m).$nota"
+                    "\n\n📍 Regla \"${geo.ruleName}\": estás escaneando lejos de la parada."
+                verbo to "📡 Estás a ${"%.0f".format(geo.distanceM)}m de la parada más cercana (radio permitido: ${"%.0f".format(geo.radiusM)}m).$nota"
             }
             is GeofenceEvaluator.Result.Inside -> {
-                "🚫 ESCANEO QR DETECTADO" to "Se detectaron elementos de escaneo:\n$contextStr\n\n✅ Estás dentro de la zona permitida por la regla \"${geo.ruleName}\".\nVerificá el horario antes de continuar."
+                "🚫 ESCANEO QR DETECTADO" to "✅ Estás dentro de la zona permitida por la regla \"${geo.ruleName}\".\nVerificá el horario antes de continuar."
             }
             else -> {
-                "🚫 ESCANEO QR DETECTADO" to "Se detectaron elementos de escaneo:\n$contextStr\n\n⚠️ Verificá que el horario sea el correcto antes de escanear."
+                "🚫 ESCANEO QR DETECTADO" to "⚠️ Verificá que el horario sea el correcto antes de escanear."
             }
         }
     }
@@ -585,11 +584,7 @@ class LogisticsAccessibilityService : AccessibilityService() {
         blockingShown = true
         Log.i(TAG, "🚫 BLOQUEO escaneo — geoOutside=$geoOutside outOfSchedule=$outOfSchedule keywords=$detectedKeywords")
 
-        val contextStr = allTexts.filter { text ->
-            detectedKeywords.any { kw -> text.contains(kw, ignoreCase = true) }
-        }.take(5).joinToString("\n• ", prefix = "• ")
-
-        val (title, message) = buildScanOverlayContent(contextStr)
+        val (title, message) = buildScanOverlayContent(geo)
 
         mainHandler.post {
             overlayManager.showBlockingOverlay(
