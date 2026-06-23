@@ -336,8 +336,14 @@ class MainActivity : AppCompatActivity() {
         // sigue corriendo el ScheduleSyncWorker cada 15 min.
         val syncResult = meRepository.syncFromBackend()
         if (syncResult.reglasOk || syncResult.rutaOk) {
-            // Solo repintamos si UI ya esta visible.
-            runOnUiThread { updateSessionDisplay() }
+            // Repintar en vivo: la tarjeta de sesión y, si cambió la ruta (asignar/
+            // desasignar desde el panel), también la pantalla "Mi Ruta" + el mapa.
+            // Antes solo se refrescaba updateSessionDisplay, así que el cambio de
+            // ruta no se veía hasta minimizar y volver (onResume). Ver I-34.
+            runOnUiThread {
+                updateSessionDisplay()
+                if (syncResult.rutaOk) renderMiRuta()
+            }
         }
     }
 
@@ -360,10 +366,24 @@ class MainActivity : AppCompatActivity() {
             }
             viewFlipper.displayedChild = idx
             tvSectionTitle.setText(titleRes)
+            // I-34 — al entrar al tab "Mi Ruta", sincronizar y repintar al instante
+            // para reflejar asignaciones/desasignaciones recientes sin esperar el
+            // polling de 30s ni minimizar la app.
+            if (idx == 1) refreshRutaNow()
             true
         }
         // Arranca en Inicio.
         bottomNav.selectedItemId = R.id.tab_inicio
+    }
+
+    /** I-34 — sync de ruta on-demand + repintado inmediato de "Mi Ruta". */
+    private fun refreshRutaNow() {
+        renderMiRuta() // pinta lo cacheado ya mismo
+        lifecycleScope.launch {
+            val sync = meRepository.syncFromBackend()
+            if (sync.rutaOk) renderMiRuta() // repinta con lo recién bajado
+            if (sync.rutaOk || sync.reglasOk) updateSessionDisplay()
+        }
     }
 
     private fun setupButtons() {

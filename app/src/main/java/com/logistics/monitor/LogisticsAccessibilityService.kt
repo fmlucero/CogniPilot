@@ -8,6 +8,12 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
+import com.logistics.monitor.data.MeRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Núcleo del Monitor de Logística.
@@ -96,6 +102,17 @@ class LogisticsAccessibilityService : AccessibilityService() {
     private lateinit var globalModeRepository: GlobalModeRepository
     private lateinit var kioskoModeRepository: KioskoModeRepository
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    // HU-04/HU-42 — refresco de reglas al entrar/navegar la app de trabajo. Sin
+    // esto, el GeofenceCache/AccesoOperativoEnforcer quedaban con las reglas de
+    // la última vez que CogniPilot estuvo en foreground: si el supervisor cambia
+    // una regla desde el panel mientras el repartidor está en Envíos, no se
+    // aplicaba hasta volver a abrir CogniPilot (ver I-33).
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val meRepository by lazy { MeRepository(this) }
+    @Volatile private var lastRuleSyncAt = 0L
+    @Volatile private var ruleSyncInFlight = false
+    private val RULE_SYNC_DEBOUNCE_MS = 8_000L
 
     private var warningShown = false
     private var blockingShown = false
@@ -217,6 +234,7 @@ class LogisticsAccessibilityService : AccessibilityService() {
             overlayManager.removeAllOverlays()
             overlayManager.removeKioskoOverlay()
         }
+        serviceScope.cancel()
         isServiceConnected = false
         instance = null
         Log.i(TAG, "🔴 Servicio destruido")
@@ -283,6 +301,41 @@ class LogisticsAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * I-33 — Refresca reglas (y ruta) desde el back al entrar/navegar la app de
+     * trabajo, para que el supervisor pueda cambiar una regla en el panel y se
+     * aplique sin que el repartidor reabra CogniPilot. `syncFromBackend` repuebla
+     * GeofenceCache + AccesoOperativoEnforcer + ParadaProximityWatcher. Con
+     * debounce para no spamear en la navegación interna de la app de trabajo;
+     * tras un sync exitoso re-evalúa acceso_operativo (por si una regla nueva
+     * debe echar al repartidor ya mismo).
+     */
+    private fun syncRulesOnWorkAppEnter() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (ruleSyncInFlight || now - lastRuleSyncAt < RULE_SYNC_DEBOUNCE_MS) return
+        ruleSyncInFlight = true
+        lastRuleSyncAt = now
+        serviceScope.launch {
+            try {
+                val res = meRepository.syncFromBackend()
+                if (res.reglasOk) {
+                    Log.i(TAG, "🔄 Reglas refrescadas al entrar a la app de trabajo")
+                    // Re-evaluar acceso_operativo con las reglas frescas (geofence
+                    // de escaneo se evalúa en el próximo click, no hace falta acá).
+                    mainHandler.post {
+                        if (rootInActiveWindow?.packageName?.toString() == TARGET_PACKAGE) {
+                            enforceAccesoOperativo()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "sync de reglas falló: ${e.message}")
+            } finally {
+                ruleSyncInFlight = false
+            }
+        }
+    }
+
     /** Salida manual desde el botón del overlay kiosko. */
     private fun disableKioskoFromOverlay() {
         kioskoModeRepository.setEnabled(false)
@@ -325,6 +378,15 @@ class LogisticsAccessibilityService : AccessibilityService() {
         }
 
         // ── Desde acá: pkg == TARGET_PACKAGE ──
+
+        // I-33 — al entrar/navegar la app de trabajo, refrescar reglas desde el
+        // back (con debounce) para aplicar cambios hechos en el panel sin reabrir
+        // CogniPilot. Es async: la primera evaluación puede usar cache, pero el
+        // sync llega en <1s y el click de escaneo / el ticker posterior ya usan
+        // las reglas frescas.
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            syncRulesOnWorkAppEnter()
+        }
 
         // HU-54 — el enforcement de acceso_operativo (modo app_trabajo) tiene
         // prioridad: si la regla de acceso falla (fuera de geocerca/horario),
