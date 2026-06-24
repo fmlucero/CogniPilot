@@ -233,6 +233,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        MainThreadWatchdog.setForeground(true)      // I-31 — solo medir ANR en foreground
+        MainThreadWatchdog.breadcrumb("onResume:start")
         // Fix I-28 — si volvemos a nuestra propia UI, ningún overlay de bloqueo
         // del work-app puede quedar pegado encima (causaba el "congelamiento"
         // recurrente de CogniPilot). No-op si el servicio no está activo.
@@ -267,10 +269,12 @@ class MainActivity : AppCompatActivity() {
             if (sync.rutaOk || sync.reglasOk) updateSessionDisplay()
             if (sync.rutaOk) renderMiRuta()
         }
+        MainThreadWatchdog.breadcrumb("onResume:done")
     }
 
     override fun onPause() {
         super.onPause()
+        MainThreadWatchdog.setForeground(false)     // I-31 — fuera de foreground no medimos
         rutaMap.onPause()
         stopForegroundPolling()
         stopStatusAutoRefresh()
@@ -499,7 +503,9 @@ class MainActivity : AppCompatActivity() {
 
             // HU-57 — pintar paradas (orden de recorrido) + geocercas + mi posición.
             // El mapa se oculta si ninguna parada tiene coordenadas geocodificadas.
+            MainThreadWatchdog.breadcrumb("renderMiRuta:map.render")
             rutaMap.render(paradas.sortedBy { it.orden }, LocationReporter.lastLatLng())
+            MainThreadWatchdog.breadcrumb("renderMiRuta:map.done")
             mapContainer.visibility =
                 if (rutaMap.hasContent() || rutaMap.hasMyPosition()) View.VISIBLE else View.GONE
 
