@@ -15,6 +15,11 @@
     <string name="login_error_empty">Completá email y contraseña</string>
     <string name="login_error_network">Sin conexión al servidor — reintentá</string>
 
+    <!-- I-35 — banner de estado de conexión post-login -->
+    <string name="conn_banner_offline">⚠️ Sin conexión al servidor — mostrando datos guardados. Tocá para reintentar.</string>
+    <string name="conn_banner_retrying">Reintentando conexión…</string>
+    <string name="conn_banner_restored">✅ Conexión restablecida</string>
+
     <!-- HU-55 — tabs de navegación inferior -->
     <string name="tab_inicio">Inicio</string>
     <string name="tab_ruta">Mi Ruta</string>

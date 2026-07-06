@@ -18,6 +18,7 @@
 
     <color name="cp_success">#6ED28A</color>
     <color name="cp_warning">#F5A524</color>
+    <color name="cp_warning_dim">#26F5A524</color>    <!-- 15% alpha -->
     <color name="cp_error">#EF4D4D</color>
 
     <!-- ─── Aliases para compat con código existente ─────────────── -->

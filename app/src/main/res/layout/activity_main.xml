@@ -67,6 +67,23 @@
         android:layout_height="1dp"
         android:background="@color/cp_border" />
 
+    <!-- I-35 — banner de sin-conexión: visible cuando el sync con el back
+         falla estando logueado. La app sigue operando con los datos cacheados
+         en Room (fallback offline); el banner avisa y permite reintentar. -->
+    <TextView
+        android:id="@+id/tvConnBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:background="@color/cp_warning_dim"
+        android:textColor="@color/cp_warning"
+        android:textSize="12sp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:text="@string/conn_banner_offline" />
+
     <!-- ─── Contenido por pestaña (ViewFlipper) ──────────────────── -->
     <ViewFlipper
         android:id="@+id/viewFlipper"

@@ -72,6 +72,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bottomNav: BottomNavigationView
     private lateinit var tvSectionTitle: TextView
 
+    // I-35 — banner de sin-conexión post-login. La app siempre opera con el
+    // cache de Room como fallback; esto solo hace visible que el back no
+    // responde (antes fallaba en silencio y parecía que la app "no andaba").
+    private lateinit var tvConnBanner: TextView
+    private var connBannerVisible = false
+
     // HU-56 — sección "Mi Ruta"
     private lateinit var tvRutaTitulo: TextView
     private lateinit var tvRutaResumen: TextView
@@ -184,6 +190,12 @@ class MainActivity : AppCompatActivity() {
         viewFlipper = findViewById(R.id.viewFlipper)
         bottomNav = findViewById(R.id.bottomNav)
         tvSectionTitle = findViewById(R.id.tvSectionTitle)
+        // I-35 — tap en el banner = reintento inmediato de sync.
+        tvConnBanner = findViewById(R.id.tvConnBanner)
+        tvConnBanner.setOnClickListener {
+            Toast.makeText(this, getString(R.string.conn_banner_retrying), Toast.LENGTH_SHORT).show()
+            refreshRutaNow()
+        }
         // HU-56
         tvRutaTitulo = findViewById(R.id.tvRutaTitulo)
         tvRutaResumen = findViewById(R.id.tvRutaResumen)
@@ -266,6 +278,7 @@ class MainActivity : AppCompatActivity() {
         // Refresh de ruta/reglas en background — best effort, sin bloquear UI
         lifecycleScope.launch {
             val sync = meRepository.syncFromBackend()
+            onSyncOutcome(sync.rutaOk || sync.reglasOk)
             if (sync.rutaOk || sync.reglasOk) updateSessionDisplay()
             if (sync.rutaOk) renderMiRuta()
         }
@@ -339,6 +352,9 @@ class MainActivity : AppCompatActivity() {
         // sincronización (máx 30 seg con conexión)" — esto lo cubre. En background
         // sigue corriendo el ScheduleSyncWorker cada 15 min.
         val syncResult = meRepository.syncFromBackend()
+        // I-35 — el polling de 30s es quien mantiene el banner al día: lo
+        // muestra al perder el back y lo esconde solo al reconectar.
+        runOnUiThread { onSyncOutcome(syncResult.reglasOk || syncResult.rutaOk) }
         if (syncResult.reglasOk || syncResult.rutaOk) {
             // Repintar en vivo: la tarjeta de sesión y, si cambió la ruta (asignar/
             // desasignar desde el panel), también la pantalla "Mi Ruta" + el mapa.
@@ -385,8 +401,28 @@ class MainActivity : AppCompatActivity() {
         renderMiRuta() // pinta lo cacheado ya mismo
         lifecycleScope.launch {
             val sync = meRepository.syncFromBackend()
+            onSyncOutcome(sync.rutaOk || sync.reglasOk)
             if (sync.rutaOk) renderMiRuta() // repinta con lo recién bajado
             if (sync.rutaOk || sync.reglasOk) updateSessionDisplay()
+        }
+    }
+
+    /**
+     * I-35 — refleja si el back respondió en el último sync. Con que UNA parte
+     * (ruta o reglas) haya sincronizado, el servidor está vivo → banner fuera.
+     * Si todo falló (sin red / túnel caído / back down), banner visible. La app
+     * sigue funcionando con el cache de Room — el banner solo lo hace explícito.
+     */
+    private fun onSyncOutcome(serverOk: Boolean) {
+        if (serverOk) {
+            if (connBannerVisible) {
+                connBannerVisible = false
+                tvConnBanner.visibility = View.GONE
+                Toast.makeText(this, getString(R.string.conn_banner_restored), Toast.LENGTH_SHORT).show()
+            }
+        } else if (!connBannerVisible) {
+            connBannerVisible = true
+            tvConnBanner.visibility = View.VISIBLE
         }
     }
 
