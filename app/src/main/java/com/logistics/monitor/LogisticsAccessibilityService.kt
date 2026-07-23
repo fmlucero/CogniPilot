@@ -666,7 +666,7 @@ class LogisticsAccessibilityService : AccessibilityService() {
                     }
                 },
                 onCancel = {
-                    Log.i(TAG, "✅ Usuario canceló el escaneo — disparando back global")
+                    Log.i(TAG, "✅ Usuario aceptó el bloqueo — mandando la app de trabajo a Home")
                     blockingShown = false
                     EventReporter.report(
                         this,
@@ -677,9 +677,9 @@ class LogisticsAccessibilityService : AccessibilityService() {
                     mainHandler.post {
                         Toast.makeText(this, "✅ Escaneo cancelado correctamente", Toast.LENGTH_SHORT).show()
                     }
-                    // Simula el gesto "atrás": en pantalla principal minimiza, en
-                    // pantalla secundaria retrocede. Es lo que pidió el usuario.
-                    performGlobalAction(GLOBAL_ACTION_BACK)
+                    // "Aceptar" acata el bloqueo: minimiza la app de trabajo mandando
+                    // al launcher (mismo mecanismo que el enforcement de HU-54).
+                    performGlobalAction(GLOBAL_ACTION_HOME)
                 }
             )
         }

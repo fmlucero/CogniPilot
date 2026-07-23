@@ -392,6 +392,11 @@ class MainActivity : AppCompatActivity() {
             if (idx == 1) refreshRutaNow()
             true
         }
+        // Re-tap del tab ya activo: el listener de selección no se dispara, así
+        // que sin esto no había forma de refrescar estando parado en "Mi Ruta".
+        bottomNav.setOnItemReselectedListener { item ->
+            if (item.itemId == R.id.tab_ruta) refreshRutaNow()
+        }
         // Arranca en Inicio.
         bottomNav.selectedItemId = R.id.tab_inicio
     }

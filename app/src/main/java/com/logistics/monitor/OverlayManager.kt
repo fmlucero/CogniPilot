@@ -15,7 +15,8 @@ import android.widget.TextView
 /**
  * Maneja los dos overlays del sistema:
  *  1. showWarningOverlay()  → 1er cartel (informativo, se cierra solo o con tap)
- *  2. showBlockingOverlay() → 2do cartel (bloqueo con opciones Continuar / Cancelar)
+ *  2. showBlockingOverlay() → 2do cartel (bloqueo con opciones Continuar / Aceptar;
+ *     Aceptar acata el bloqueo y minimiza la app de trabajo vía GLOBAL_ACTION_HOME)
  *
  * Usa TYPE_APPLICATION_OVERLAY que requiere el permiso SYSTEM_ALERT_WINDOW.
  */
