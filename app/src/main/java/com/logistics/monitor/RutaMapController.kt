@@ -40,6 +40,9 @@ class RutaMapController(
     // Markers de parada por id, para poder centrar el mapa al tocar su card (interactividad HU-60).
     private val paradaMarkers = LinkedHashMap<String, Marker>()
     private var initialized = false
+    // I-31: encuadre diferido hasta que el MapView tenga medidas reales.
+    private var pendingBox: BoundingBox? = null
+    private var firstLayoutHooked = false
 
     /** Configura el tile source y los gestos. Idempotente. */
     fun init() {
@@ -182,15 +185,39 @@ class RutaMapController(
             }
             else -> {
                 val box = BoundingBox.fromGeoPoints(all)
-                // post() para esperar a que el MapView tenga medidas (evita crash si aún no se midió).
-                map.post {
-                    try {
-                        map.zoomToBoundingBox(box, false, 80)
-                    } catch (_: Exception) {
-                        map.controller.setCenter(all[0])
+                // I-31: zoomToBoundingBox con el MapView sin medir (width/height 0
+                // — al abrir la app con ruta, el tab "Mi Ruta" arranca GONE en el
+                // ViewFlipper) hace que osmdroid derive un zoom degenerado y
+                // Projection.getCloserPixel clave el main thread ~5,5s por cada
+                // render. El map.post{} anterior esperaba al message queue, no al
+                // layout. Con medidas válidas se encuadra ya; si no, se difiere al
+                // primer layout real del MapView.
+                if (box.latitudeSpan < 1e-6 && box.longitudeSpanWithDateLine < 1e-6) {
+                    // Todas las paradas en el mismo punto: box de span 0 también
+                    // degenera el zoom. Se trata como punto único.
+                    map.controller.setZoom(16.0)
+                    map.controller.setCenter(all[0])
+                } else if (map.width > 0 && map.height > 0) {
+                    applyBoundingBox(box)
+                } else {
+                    pendingBox = box
+                    if (!firstLayoutHooked) {
+                        firstLayoutHooked = true
+                        map.addOnFirstLayoutListener { _, _, _, _, _ ->
+                            pendingBox?.let { applyBoundingBox(it) }
+                            pendingBox = null
+                        }
                     }
                 }
             }
+        }
+    }
+
+    private fun applyBoundingBox(box: BoundingBox) {
+        try {
+            map.zoomToBoundingBox(box, false, 80)
+        } catch (_: Exception) {
+            map.controller.setCenter(box.centerWithDateLine)
         }
     }
 
