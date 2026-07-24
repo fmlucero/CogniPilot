@@ -59,6 +59,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnOpenAccessibility: Button
     private lateinit var btnToggleGlobal: Button
     private lateinit var globalModeRepository: GlobalModeRepository
+    private lateinit var btnToggleCapture: Button
+    private lateinit var captureModeRepository: CaptureModeRepository
 
     // HU-59 — modo kiosko de jornada
     private lateinit var kioskoSection: LinearLayout
@@ -187,6 +189,7 @@ class MainActivity : AppCompatActivity() {
         btnConfigureOverlay = findViewById(R.id.btnConfigureOverlay)
         btnOpenAccessibility = findViewById(R.id.btnOpenAccessibility)
         btnToggleGlobal = findViewById(R.id.btnToggleGlobal)
+        btnToggleCapture = findViewById(R.id.btnToggleCapture)
         viewFlipper = findViewById(R.id.viewFlipper)
         bottomNav = findViewById(R.id.bottomNav)
         tvSectionTitle = findViewById(R.id.tvSectionTitle)
@@ -216,6 +219,7 @@ class MainActivity : AppCompatActivity() {
         btnPermLocation = findViewById(R.id.btnPermLocation)
         btnPermNotif = findViewById(R.id.btnPermNotif)
         globalModeRepository = GlobalModeRepository(this)
+        captureModeRepository = CaptureModeRepository(this)
         // HU-59
         kioskoSection = findViewById(R.id.kioskoSection)
         btnToggleKiosko = findViewById(R.id.btnToggleKiosko)
@@ -225,6 +229,7 @@ class MainActivity : AppCompatActivity() {
         setupTabs()
         setupButtons()
         updateGlobalButtonLabel()
+        updateCaptureButtonLabel()
         updateSessionDisplay()
 
         // HU-18: schedule del worker periódico (background sync cada 15 min)
@@ -470,6 +475,19 @@ class MainActivity : AppCompatActivity() {
                 this,
                 if (newState) "🌐 Modo global ACTIVADO — todas las apps reportan"
                 else "🌐 Modo global desactivado — solo SC Pack",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+
+        btnToggleCapture.setOnClickListener {
+            val newState = !captureModeRepository.isEnabled()
+            captureModeRepository.setEnabled(newState)
+            LogisticsAccessibilityService.applyCaptureMode(newState)
+            updateCaptureButtonLabel()
+            Toast.makeText(
+                this,
+                if (newState) "🔎 Modo exploración ACTIVADO — capturando estructura de SC Pack"
+                else "🔎 Modo exploración desactivado",
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -765,6 +783,21 @@ class MainActivity : AppCompatActivity() {
             if (enabled) R.color.cp_success else R.color.cp_bg_elev_2
         )
         btnToggleGlobal.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (enabled) R.color.cp_accent_text else R.color.cp_text,
+            )
+        )
+    }
+
+    private fun updateCaptureButtonLabel() {
+        val enabled = captureModeRepository.isEnabled()
+        btnToggleCapture.text = if (enabled) "🔎 Modo exploración: ON" else "🔎 Modo exploración: OFF"
+        btnToggleCapture.backgroundTintList = ContextCompat.getColorStateList(
+            this,
+            if (enabled) R.color.cp_success else R.color.cp_bg_elev_2
+        )
+        btnToggleCapture.setTextColor(
             ContextCompat.getColor(
                 this,
                 if (enabled) R.color.cp_accent_text else R.color.cp_text,

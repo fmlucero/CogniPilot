@@ -177,6 +177,28 @@
                     android:backgroundTint="@color/cp_bg_elev_2"
                     android:textColor="@color/cp_text" />
 
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Modo exploración: captura la estructura de las pantallas de SC Pack (con dedup) para analizar cómo organiza las rutas. Sólo para el piloto."
+                    android:textSize="12sp"
+                    android:textColor="@color/cp_text_muted"
+                    android:lineSpacingExtra="2dp"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="8dp" />
+
+                <Button
+                    android:id="@+id/btnToggleCapture"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="🔎 Modo exploración: OFF"
+                    android:textAllCaps="false"
+                    android:fontFamily="@font/barlow_condensed_bold"
+                    android:textSize="15sp"
+                    android:letterSpacing="0.03"
+                    android:backgroundTint="@color/cp_bg_elev_2"
+                    android:textColor="@color/cp_text" />
+
                 <!-- HU-59 — Modo kiosko de jornada. Sólo visible si la empresa
                      tiene una regla acceso_operativo en modo kiosko. -->
                 <LinearLayout

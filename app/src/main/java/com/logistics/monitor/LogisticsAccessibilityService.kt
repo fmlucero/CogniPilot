@@ -83,6 +83,13 @@ class LogisticsAccessibilityService : AccessibilityService() {
             instance?.onKioskoModeChanged(enabled)
         }
 
+        /** Modo exploración — llamado desde MainActivity al togglear la captura
+         *  de estructura de SC Pack. El estado se lee del repo en cada evento;
+         *  esto sólo cancela capturas pendientes al desactivar y loguea. */
+        fun applyCaptureMode(enabled: Boolean) {
+            instance?.onCaptureModeChanged(enabled)
+        }
+
         /**
          * Fix I-28 — llamado desde MainActivity.onResume(). Si el usuario está
          * viendo NUESTRA propia app, ningún overlay de bloqueo del work-app debe
@@ -101,7 +108,16 @@ class LogisticsAccessibilityService : AccessibilityService() {
     private lateinit var scheduleRepository: ScheduleRepository
     private lateinit var globalModeRepository: GlobalModeRepository
     private lateinit var kioskoModeRepository: KioskoModeRepository
+    private lateinit var captureModeRepository: CaptureModeRepository
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    // Modo exploración (piloto): captura la estructura de las pantallas de SC
+    // Pack con dedup por huella. Debounce para esperar a que la pantalla se
+    // estabilice (listas que cargan async) antes de recorrer el árbol.
+    private val screenCapturer = ScreenStructureCapturer()
+    private val CAPTURE_DEBOUNCE_MS = 1_200L
+    @Volatile private var lastTargetActivity: String? = null
+    private val captureRunnable = Runnable { runScreenCapture() }
 
     // HU-04/HU-42 — refresco de reglas al entrar/navegar la app de trabajo. Sin
     // esto, el GeofenceCache/AccesoOperativoEnforcer quedaban con las reglas de
@@ -178,6 +194,7 @@ class LogisticsAccessibilityService : AccessibilityService() {
         scheduleRepository = ScheduleRepository(this)
         globalModeRepository = GlobalModeRepository(this)
         kioskoModeRepository = KioskoModeRepository(this)
+        captureModeRepository = CaptureModeRepository(this)
         kioskoEnabled = kioskoModeRepository.isEnabled()
         isServiceConnected = true
         instance = this
@@ -190,7 +207,11 @@ class LogisticsAccessibilityService : AccessibilityService() {
         val info = AccessibilityServiceInfo().apply {
             eventTypes =
                 AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
-                AccessibilityEvent.TYPE_VIEW_CLICKED
+                AccessibilityEvent.TYPE_VIEW_CLICKED or
+                // Modo exploración: cambios de contenido (listas que cargan,
+                // scroll) para capturar la ruta completa. El filtrado por
+                // package + debounce + dedup evita el flood.
+                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
             flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
                     AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
@@ -230,6 +251,7 @@ class LogisticsAccessibilityService : AccessibilityService() {
         super.onDestroy()
         mainHandler.removeCallbacks(enforceRunnable)
         mainHandler.removeCallbacks(kioskoRunnable)
+        mainHandler.removeCallbacks(captureRunnable)
         if (::overlayManager.isInitialized) {
             overlayManager.removeAllOverlays()
             overlayManager.removeKioskoOverlay()
@@ -378,6 +400,25 @@ class LogisticsAccessibilityService : AccessibilityService() {
         }
 
         // ── Desde acá: pkg == TARGET_PACKAGE ──
+
+        val et = event.eventType
+
+        // Modo exploración: capturar la estructura de la pantalla (debounced +
+        // dedup) en cambios de pantalla o de contenido. Recordamos el nombre de
+        // la Activity del último WINDOW_STATE_CHANGED para etiquetar la captura
+        // (el árbol raíz no lo expone de forma confiable).
+        if (et == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            event.className?.toString()?.substringAfterLast('.')?.let { lastTargetActivity = it }
+        }
+        if (captureModeRepository.isEnabled() &&
+            (et == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
+                et == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)
+        ) {
+            scheduleScreenCapture()
+        }
+        // Los cambios de contenido no participan del flujo legacy de
+        // reglas/overlays (ese se maneja en STATE_CHANGED y VIEW_CLICKED).
+        if (et == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) return
 
         // I-33 — al entrar/navegar la app de trabajo, refrescar reglas desde el
         // back (con debounce) para aplicar cambios hechos en el panel sin reabrir
@@ -694,6 +735,48 @@ class LogisticsAccessibilityService : AccessibilityService() {
         warningShown = false
         blockingShown = false
         mainHandler.post { overlayManager.removeAllOverlays() }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Modo exploración — captura de estructura de SC Pack
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun onCaptureModeChanged(enabled: Boolean) {
+        if (!enabled) mainHandler.removeCallbacks(captureRunnable)
+        Log.i(TAG, "🔎 Modo exploración ${if (enabled) "ACTIVADO" else "DESACTIVADO"}")
+    }
+
+    /** Re-agenda la captura; cada nuevo evento reinicia el debounce para que el
+     *  árbol se recorra una vez que la pantalla dejó de cambiar. */
+    private fun scheduleScreenCapture() {
+        mainHandler.removeCallbacks(captureRunnable)
+        mainHandler.postDelayed(captureRunnable, CAPTURE_DEBOUNCE_MS)
+    }
+
+    /** Recorre la pantalla actual y, si es novedosa, la reporta. Corre en el
+     *  hilo principal (acceso a nodos de accesibilidad); el trabajo está acotado
+     *  por los topes de nodos/líneas del capturador. La red la hace EventReporter
+     *  fuera del main, con cola offline. */
+    private fun runScreenCapture() {
+        try {
+            val root = rootInActiveWindow ?: return
+            try {
+                if (root.packageName?.toString() != TARGET_PACKAGE) return
+                val cap = screenCapturer.capture(root, lastTargetActivity) ?: return
+                Log.i(TAG, "🔎 [EXPLORA] ${cap.screenName} — ${cap.lines.size} líneas")
+                EventReporter.report(
+                    this,
+                    EventReporter.TYPE_GLOBAL_APP_OPENED,
+                    appPackage = TARGET_PACKAGE,
+                    screenName = cap.screenName,
+                    screenText = cap.lines,
+                )
+            } finally {
+                root.recycle()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "captura de estructura falló: ${e.message}")
+        }
     }
 
     /**
