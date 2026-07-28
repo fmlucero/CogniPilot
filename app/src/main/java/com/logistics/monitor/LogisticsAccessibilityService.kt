@@ -9,6 +9,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 import com.logistics.monitor.data.MeRepository
+import java.time.LocalTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -602,6 +603,17 @@ class LogisticsAccessibilityService : AccessibilityService() {
 
         if (texts.isEmpty()) return
 
+        // ── Colecta por parada (SC Pack) ──
+        // El botón real de colecta se llama exactamente "Colectar" (distinto de
+        // "No pude colectar"). Es la acción a controlar: no colectar fuera de la
+        // ventana horaria de ESA parada (el problema de "llegar antes"). Tiene
+        // prioridad sobre el detector genérico de escaneo.
+        val isColectar = texts.any { it.trim().trimEnd('.').equals("Colectar", ignoreCase = true) }
+        if (isColectar) {
+            onColectarClicked()
+            return
+        }
+
         val matched = texts.flatMap { text ->
             QR_KEYWORDS.filter { kw -> text.contains(kw, ignoreCase = true) }
         }.distinct()
@@ -609,6 +621,136 @@ class LogisticsAccessibilityService : AccessibilityService() {
         if (matched.isNotEmpty()) {
             Log.i(TAG, "🚨 Click con keywords QR=$matched, textos=$texts")
             onQRScanDetected(texts, matched)
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Bloqueo por parada: colectar fuera de la ventana horaria
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private data class StopWindow(
+        val parada: String?,     // "Parada 1"
+        val direccion: String?,  // "Calle Bulnes 1776"
+        val desde: LocalTime,
+        val hasta: LocalTime,
+        val ventanaText: String, // "14:35 – 15:05"
+    )
+
+    // "14:35hs a 15:05hs" | "14:35 - 15:05" | "14:35 a 15:05"
+    private val ventanaRegex =
+        Regex("""(\d{1,2}):(\d{2})\s*(?:hs)?\s*(?:a|-|–|—)\s*(\d{1,2}):(\d{2})""")
+    private val paradaRegex = Regex("""^Parada\s+\d+""", RegexOption.IGNORE_CASE)
+
+    /**
+     * Al tocar "Colectar" en la pantalla de una parada, lee de la MISMA pantalla
+     * el número de parada y su ventana horaria, y bloquea si la hora actual está
+     * fuera de la ventana (antes o después). No depende de la ruta importada: la
+     * ventana viene en pantalla (`flux_components_row_paragraph_text`).
+     */
+    private fun onColectarClicked() {
+        val info = try {
+            rootInActiveWindow?.let { root ->
+                try { extractStopWindow(root) } finally { root.recycle() }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "lectura de ventana de parada falló: ${e.message}"); null
+        }
+
+        if (info == null) {
+            // Sin ventana legible en pantalla → fail-open (no bloqueamos a ciegas).
+            Log.i(TAG, "Colectar sin ventana legible — no se bloquea")
+            return
+        }
+
+        val now = LocalTime.now()
+        val outside = now.isBefore(info.desde) || now.isAfter(info.hasta)
+        val nowTxt = "%02d:%02d".format(now.hour, now.minute)
+        Log.i(TAG, "🧾 Colectar ${info.parada} ventana=${info.ventanaText} ahora=$nowTxt outside=$outside")
+
+        EventReporter.report(
+            this,
+            EventReporter.TYPE_SCAN_DETECTED,
+            screenName = "${info.parada ?: "Parada"} · colecta ${info.ventanaText}",
+            inSchedule = !outside,
+        )
+
+        if (!outside) return  // dentro de la ventana → permitido
+
+        blockingShown = true
+        val cuando = if (now.isBefore(info.desde)) "todavía no abrió" else "ya cerró"
+        val paradaLbl = info.parada ?: "esta parada"
+        val dir = info.direccion?.let { "\n$it" } ?: ""
+        mainHandler.post {
+            overlayManager.showBlockingOverlay(
+                title = "🚫 COLECTA FUERA DE HORARIO",
+                message = "$paradaLbl$dir\nVentana ${info.ventanaText} — son las $nowTxt ($cuando).\n\nNo deberías colectar fuera del horario de la parada.",
+                onContinue = {
+                    Log.w(TAG, "⚠️ Colecta fuera de ventana — usuario CONTINUÓ")
+                    blockingShown = false
+                    EventReporter.report(
+                        this, EventReporter.TYPE_USER_CONTINUED,
+                        screenName = "${info.parada ?: "Parada"} · colecta fuera de ventana",
+                        inSchedule = false,
+                    )
+                    mainHandler.post {
+                        Toast.makeText(this, "⚠️ Colecta permitida por el usuario", Toast.LENGTH_LONG).show()
+                    }
+                },
+                onCancel = {
+                    Log.i(TAG, "✅ Colecta fuera de ventana — usuario ACEPTÓ el bloqueo → Home")
+                    blockingShown = false
+                    EventReporter.report(
+                        this, EventReporter.TYPE_USER_CANCELLED,
+                        screenName = "${info.parada ?: "Parada"} · colecta fuera de ventana",
+                        inSchedule = false,
+                    )
+                    mainHandler.post {
+                        Toast.makeText(this, "✅ Colecta cancelada", Toast.LENGTH_SHORT).show()
+                    }
+                    performGlobalAction(GLOBAL_ACTION_HOME)
+                },
+            )
+        }
+    }
+
+    /** Recorre la pantalla y extrae "Parada N" + su ventana horaria + dirección. */
+    private fun extractStopWindow(root: AccessibilityNodeInfo): StopWindow? {
+        val nodes = ArrayList<Pair<String, String>>(80)  // (viewId, texto)
+        collectIdTexts(root, nodes, 0)
+
+        var parada: String? = null
+        var direccion: String? = null
+        var match: MatchResult? = null
+        for ((vid, t) in nodes) {
+            if (parada == null && (vid.endsWith("toolbar_title") && paradaRegex.containsMatchIn(t)))
+                parada = t.trim()
+            if (direccion == null && (vid == "components_row_address_title" || vid == "listing_stops_row_title"))
+                direccion = t.trim()
+            if (match == null) ventanaRegex.find(t)?.let { match = it }
+        }
+        // Respaldo para "Parada N" si no vino por el viewId del toolbar.
+        if (parada == null) parada = nodes.firstOrNull { paradaRegex.containsMatchIn(it.second) }?.second?.trim()
+        val m = match ?: return null
+
+        return try {
+            val (h1, m1, h2, m2) = m.destructured
+            val desde = LocalTime.of(h1.toInt(), m1.toInt())
+            val hasta = LocalTime.of(h2.toInt(), m2.toInt())
+            StopWindow(parada, direccion, desde, hasta,
+                "%02d:%02d – %02d:%02d".format(desde.hour, desde.minute, hasta.hour, hasta.minute))
+        } catch (_: Exception) { null }
+    }
+
+    private fun collectIdTexts(node: AccessibilityNodeInfo, out: MutableList<Pair<String, String>>, depth: Int) {
+        if (out.size >= 160 || depth > 16) return
+        val vid = node.viewIdResourceName?.substringAfterLast('/').orEmpty()
+        node.text?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let { out.add(vid to it) }
+        node.contentDescription?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let { out.add(vid to it) }
+        for (i in 0 until node.childCount) {
+            node.getChild(i)?.let { child ->
+                collectIdTexts(child, out, depth + 1)
+                child.recycle()
+            }
         }
     }
 
