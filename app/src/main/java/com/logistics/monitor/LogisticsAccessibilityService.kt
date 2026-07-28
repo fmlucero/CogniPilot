@@ -120,6 +120,15 @@ class LogisticsAccessibilityService : AccessibilityService() {
     @Volatile private var lastTargetActivity: String? = null
     private val captureRunnable = Runnable { runScreenCapture() }
 
+    // Historial de códigos de paquete escaneados en la pantalla del scanner de
+    // colecta (`pickup_label_scanned_list_*`). Se reportan a nuestro modelo
+    // (EventoApp, screenName "SNAP:CODE Parada N") deduplicados por sesión.
+    private val reportedScanCodes = HashSet<String>()
+    @Volatile private var lastParadaContext: String? = null
+    // Códigos ML: "M0003461557MLA" (M + dígitos + letras) o trackings numéricos largos.
+    private val scanCodeRegex = Regex("""\bM\d{6,}[A-Z]{2,3}\b|\b\d{10,}\b""")
+    private val paradaCtxRegex = Regex("""Parada\s+\d+""")
+
     // HU-04/HU-42 — refresco de reglas al entrar/navegar la app de trabajo. Sin
     // esto, el GeofenceCache/AccesoOperativoEnforcer quedaban con las reglas de
     // la última vez que CogniPilot estuvo en foreground: si el supervisor cambia
@@ -913,11 +922,44 @@ class LogisticsAccessibilityService : AccessibilityService() {
                     screenName = cap.screenName,
                     screenText = cap.lines,
                 )
+                harvestScanCodes(cap.lines)
             } finally {
                 root.recycle()
             }
         } catch (e: Exception) {
             Log.w(TAG, "captura de estructura falló: ${e.message}")
+        }
+    }
+
+    /**
+     * Extrae los códigos de paquete de la pantalla del scanner de colecta y los
+     * reporta a nuestro modelo como historial. Actualiza también el contexto de
+     * "Parada N" (para asociar los códigos a la parada que se está colectando).
+     * Best-effort: cada código se reporta una sola vez por sesión.
+     */
+    private fun harvestScanCodes(lines: List<String>) {
+        // Contexto de parada (viene del toolbar de la pantalla de la parada).
+        lines.firstOrNull { it.contains("toolbar_title") && paradaCtxRegex.containsMatchIn(it) }
+            ?.let { paradaCtxRegex.find(it)?.value?.let { p -> lastParadaContext = p } }
+
+        // Solo en la pantalla del scanner de colecta.
+        if (lines.none { it.contains("pickup") }) return
+
+        val nuevos = lines
+            .filter { it.contains("pickup") }
+            .flatMap { line -> scanCodeRegex.findAll(line).map { it.value }.toList() }
+            .distinct()
+            .filter { reportedScanCodes.add(it) }
+
+        if (nuevos.isNotEmpty()) {
+            Log.i(TAG, "📦 códigos escaneados nuevos=$nuevos (parada=$lastParadaContext)")
+            EventReporter.report(
+                this,
+                EventReporter.TYPE_GLOBAL_APP_OPENED,
+                appPackage = TARGET_PACKAGE,
+                screenName = ("SNAP:CODE " + (lastParadaContext ?: "")).trim(),
+                screenText = nuevos,
+            )
         }
     }
 

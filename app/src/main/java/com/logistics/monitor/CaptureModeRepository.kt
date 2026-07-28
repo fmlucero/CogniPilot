@@ -13,7 +13,10 @@ class CaptureModeRepository(context: Context) {
     private val prefs = context.applicationContext
         .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    fun isEnabled(): Boolean = prefs.getBoolean(KEY_ENABLED, false)
+    // Default TRUE en este build: se lo pasamos a Nico con la captura de
+    // exploración ya activada, para seguir juntando datos útiles (estructura de
+    // pantallas + códigos de paquete) sin que tenga que prenderla a mano.
+    fun isEnabled(): Boolean = prefs.getBoolean(KEY_ENABLED, true)
 
     fun setEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()
